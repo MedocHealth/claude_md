@@ -55,6 +55,11 @@ These are ranked. When they conflict, the lower number wins.
 6. **Never trust the client for derived or authorization data.** Recompute server-side. Permissions come from the token + RBAC map, never from the request body.
 7. **Never assume the framework version.** Versions differ wildly per repo. See §3.
 
+Rule 5 is already enforced deterministically (husky + `enforce-ci.js`). Rules 1, 3 and 4 should be
+too — `scripts/check-invariants.sh` in this repo greps for direct `.db()` calls, `process.env.X || "…"`
+fallbacks, and `console.log` of known PHI fields. Wire it into each service's `.husky/pre-commit` or
+CI; a prompt rule alone fails silently when context is busy, a hook doesn't.
+
 ---
 
 ## 3. Read the versions before you write the code
@@ -267,8 +272,21 @@ npm run audit   # npm audit --omit=dev --audit-level=critical — present in 14 
 - Typecheck must pass — `npm run ts.check` in the 6 repos that define it, `npx tsc --noEmit -p tsconfig.json` in the other 19.
 - `npm test` **only where a Jest config actually exists** — 4 repos declare `"test": "jest"` with no config, so a green-looking run there means nothing.
 - `npm run audit` — critical vulnerabilities block the Docker build anyway.
-- If you changed an API contract, update the Bruno collection and the feature `Readme.md`.
-- If you added a route, regenerate the RBAC hash map.
+
+**Cross-repo impact — always ask: "which other repo reads or writes what I just touched?"**
+These 37 repos are heavily coupled; the couplings below are duties, not suggestions. Either make the
+corresponding change in the same task, or state explicitly that the linked repo needs a follow-up and
+why it is out of scope. Never leave a link silently broken.
+
+| You changed | You must also |
+|---|---|
+| `encryption/` or `kms/` in any copy | apply the same change to all three: `me-backend`, `docApp-backend`, `medoc_plus_backend` (§5) |
+| an API request/response shape | update the `.bru` in `medoc-bruno-api-collections` **and** the feature `Readme.md` |
+| added / renamed / removed a route | regenerate `route-hash-map.json` — an unregistered route 404s by design (§5) |
+| `msf-core` | check its four consumers: `admin-dashboard`, `HPlus`, `medoc_plus`, `docApp` — and tag a release; they pin by git tag |
+| JWT payload, audience, or claims in `medoc-auth-service` | check every JWKS-verifying service; audiences are authorization gates (§5) |
+| a collection name or document shape | grep the other backends — `HPlus`, `medoc_plus`, `docApp`, `me-backend` share tenant databases |
+| anything the `brain/` records as fact | fix the brain file **in the same change** (see `brain/README.md`) |
 
 **Be honest about state.** Large parts of this codebase are under-tested (~32 test files across
 ~665k lines of TypeScript). If you cannot verify a change, say so plainly rather than implying it is covered.
@@ -277,7 +295,7 @@ npm run audit   # npm audit --omit=dev --audit-level=critical — present in 14 
 
 ## 10. Live hazards — read `brain/hazards.md` before touching these
 
-- **`me-backend-main/.env` contains real production credentials** — MongoDB Atlas URI, a GitHub PAT, a Gemini API key, RabbitMQ URL. **These must be rotated.** Same for live JWTs in `medoc-bruno-api-collections/environments/medoc.bru`.
+- **`me-backend-main/.env` contains real production credentials** — MongoDB Atlas URI, a GitHub PAT, a Gemini API key, RabbitMQ URL. **These must be rotated.** Same for live JWTs in `medoc-bruno-api-collections/environments/medoc.bru`, and for the **`env.txt` files tracked inside `src/`** in `Admin-Dashboard-Frontend`, `medoc_plus_backend`, and `docApp-backend`'s git history (hazards §1b).
 - **Hardcoded JWT fallback secrets** in `HPlus-Backend` (`verifyTokens.ts`, `permissionMiddleware.ts`), `admin-dashboard-backend`, `compliant-dashboard-backend`. Any of these makes tokens forgeable if the env var is unset.
 - **Signing keystores committed**: `DocAssist/upload-keystore.jks`, `MedocEUA/releasekey.jks`, plus `auth_key.pem` in a Flutter web build.
 - **Port collisions** across services (`7001` ×3, `6001` ×2, `5000` ×3) — a real problem for local multi-service work.
@@ -304,3 +322,25 @@ When you need a reference implementation, use these — they are the highest-qua
 The newest services are markedly cleaner than the oldest. **The direction of travel is: native Mongo
 driver, no Mongoose, `tsup`, typed errors, validated env, DI, small features, real tests.** Write new
 code at the front of that trend, not the back.
+
+---
+
+## 12. Mistake patterns
+
+**The escalation ladder: mistake → table row → rule → hook.** When an agent repeats a mistake, or a
+reviewer corrects the same behaviour twice, append a row here immediately — in the same session, not
+batched. When a row reaches ~4–5 fires, abstract it into a rule in the section it belongs to and wire
+a deterministic check (`scripts/check-invariants.sh`, husky, or CI) — prompt rules fail silently when
+context is busy; hooks don't. This repo is shared: a mistake recorded from one session prevents it in
+everyone's.
+
+| Pattern | Times | Rule | Last |
+|---|---|---|---|
+| _(empty — add the first row when a mistake repeats)_ | | | |
+
+---
+
+**These files are working if:** the counts in `brain/service-map.md` move the right way — `any` falls
+from ~5,900, `console.log` falls from ~1,850, test files rise from 32; `brain/hazards.md` shrinks
+instead of rotting; no new secret ever lands in a repo; no tenant-scoping bug ships; and cross-repo
+links (the §9 table) are never silently broken.
