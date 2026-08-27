@@ -30,6 +30,21 @@ The file is present in the repository snapshot with **populated values**:
 A GitHub PAT is the most urgent: depending on its scopes it may grant write access to every
 repository in the `MedocHealth` organisation.
 
+### 1b. `env.txt` files committed inside `src/` in at least three more repos
+
+Separate from `me-backend/.env` — these are tracked source files, so `.gitignore` does not help:
+
+| Repo | Path | State |
+|---|---|---|
+| `Admin-Dashboard-Frontend` | `src/constants/env.txt` | tracked on the current branch |
+| `medoc_plus_backend` | `src/utils/constants/env.txt` | tracked on the current branch |
+| `docApp-backend` | `src/utils/constants/env.txt` | sanitised by commit `720d321` ("Remove sensitive environment variables") — **the secrets remain in git history** |
+| `HPlus-Backend` | — | none on the branch checked; re-verify `main`/`production`/`dev` before declaring it clean |
+
+The backends share one MongoDB + Cloudinary credential set, so one leaked file compromises all of
+them. Remediation is the same as §1: rotate, delete, purge history, move to Vault. A sanitising
+commit (docApp) is **not** remediation — the values are still one `git log -p` away.
+
 ### 2. Live JWTs in `medoc-bruno-api-collections/environments/medoc.bru`
 
 `doc_token` (173 chars), `m_token` (188 chars), `me_token` (180 chars) are populated with real
@@ -59,6 +74,12 @@ is publicly readable by design of the platform — treat whatever it protects as
 | `admin-dashboard-backend/src/middleware/auth.middleware.ts` | 12 | `"your-secret-key"` |
 | `admin-dashboard-backend/src/utils/generate.helper.ts` | 46 | `"adminpaneljsontoken"` |
 | `compliant-dashboard-backend/src/middleware/auth.middleware.ts` | 11 | `"your-secret-key"` |
+| `HPlus-Backend/src/features/auth/ctrl_func.ts` | 52 | `"hplusbackendsecretkey"` |
+| `HPlus-Backend/src/utils/cloudinary/cloudinary.config.ts` | 6–7 | **a real Cloudinary `api_key`/`api_secret` pair** — this is a live credential in source, not just a weak fallback; rotate it (P0, see §1b) |
+| `HPlus-Backend/src/features/payment/services/phicommerce.service.ts` | 23, 25 | `merchantSecretKey: 'abc'`, plus a hex `aggregatorSecretKey` that looks live — verify with PhiCommerce and rotate |
+
+These are exactly what `claude_md/scripts/check-invariants.sh` greps for — run it in any service
+repo to get the current list rather than trusting this table.
 
 If the env var is ever unset — a misconfigured container, a missing Vault key, a new environment —
 the service silently signs and verifies with a secret that is public in the source tree. That is a
@@ -205,8 +226,8 @@ in that repo.
 
 | When | Work |
 |---|---|
-| **Immediately** | Rotate the `me-backend/.env` credentials; blank the Bruno tokens; purge both from history |
-| **This week** | Remove all hardcoded JWT fallbacks; add `EnvConfig` boot validation to the affected services |
+| **Immediately** | Rotate the `me-backend/.env` credentials **and the `env.txt` secrets (§1b) — including the shared Mongo + Cloudinary set**; blank the Bruno tokens; purge all from history |
+| **This week** | Remove all hardcoded JWT fallbacks; add `EnvConfig` boot validation to the affected services; wire `check-invariants.sh` into husky/CI so the fallbacks cannot return |
 | **This month** | Extract `@medoc-health/crypto-core`; add `helmet` + targeted auth rate limiting everywhere; lock down the SSH NSG rule and `CORS_ORIGINS` |
 | **This quarter** | Test coverage on billing / IPD / prescription / RBAC; optimise the Velocity assets; publish a port registry; agree one backend architecture for new services |
 | **Ongoing** | Retire `any` and `console.log` in files you touch; keep feature `Readme.md`s and the Bruno collection current |

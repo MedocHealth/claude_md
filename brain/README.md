@@ -25,6 +25,8 @@ as the code. Specifically:
 - A new architectural decision → record it as an ADR in the owning repo, and summarise it here.
 - A hazard fixed → strike it from `hazards.md` rather than leaving it to rot.
 - A version bump that crosses a major → update the version table in `../CLAUDE.md` §3.
+- A repeated agent mistake → append a row to `../CLAUDE.md` §12 in the same session; at ~4–5 fires,
+  promote it to a rule and a deterministic check (`../scripts/check-invariants.sh`, husky, CI).
 
 The model to imitate is `medoc-abdm-dashboard-backend/brain/` — dense, machine-readable, honest about
 what is a stub and what is complete.
