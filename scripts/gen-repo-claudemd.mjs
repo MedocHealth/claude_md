@@ -223,7 +223,9 @@ function render(repoName, spec, live, data) {
     L.push(`> ## ⛔ STOP — THIS REPO IS DORMANT`, ">");
     L.push(`> Do not implement features or fix bugs here.${spec.live ? ` The live repo is **\`${spec.live}\`** — work there instead.` : ""}`);
     L.push(`>`, `> Editing a dead twin is the single most common way to waste a session in this workspace.`);
-    L.push(`> Legitimate reasons to touch this repo: a security remediation, or reading it for history.`, "");
+    L.push(`> Legitimate reasons to touch this repo: a security remediation, or reading it for history.`);
+    if (spec.archived) L.push(`>`, `> **This repository is ARCHIVED on GitHub — read-only.** Nothing can be pushed to it. To`, `> revive it you would have to unarchive it first, which is a deliberate decision, not a step.`);
+    L.push("");
   } else if (status === "mirror") {
     L.push(`> ## ⚠ RELEASE MIRROR — NOT THE WORKING REPO`, ">");
     L.push(`> Shares git history with **\`${spec.live}\`**, which is ahead. Day-to-day work belongs there.`);

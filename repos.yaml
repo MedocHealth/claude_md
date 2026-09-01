@@ -23,6 +23,9 @@ meta:
 #   artifact  — compiled output, not source. Never hand-edit.
 #   stub      — empty or placeholder
 #   package   — library consumed by other repos
+#
+# archived: true — the GitHub repo is archived and READ-ONLY. Nothing can be pushed to it,
+# which makes it the strongest possible form of the dormant guard.
 
 products:
   hospital-plus: { name: "Hospital+ (Axon)", persona: "Hospital staff, doctors, admins" }
@@ -298,12 +301,14 @@ repos:
   outreach_medoc_backend:
     status: legacy
     live: Medoc-Outreach-Backend
+    archived: true
     product: outreach
     role: "Predecessor backend (last touched 2026-04)."
     hazards: ["Unauthenticated GET /dbString returns the live MONGODB_URI.", "WhatsApp key fallback."]
   Outreach-Dashboard-Frontend:
     status: legacy
     live: Medoc-Outreach-Frontend
+    archived: true
     product: outreach
     role: "Predecessor Next.js frontend (2026-03)."
     hazards: ["Tracked env.txt."]
