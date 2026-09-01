@@ -1,0 +1,639 @@
+# repos.yaml — curated source of truth for the Medoc Health workspace.
+#
+# WHAT BELONGS HERE: facts only a human knows — is this repo alive, which product
+# owns it, which repo supersedes it, what it is coupled to, what will hurt you.
+#
+# WHAT DOES NOT: versions, npm scripts, architecture, package names, ports that are
+# discoverable from source. `scripts/gen-repo-claudemd.mjs` reads those LIVE from each
+# repo's manifest at generation time, so they cannot go stale. Do not duplicate them.
+#
+# Editing this file changes 89 repos' CLAUDE.md. Regenerate and open PRs:
+#   node scripts/gen-repo-claudemd.mjs --write
+#
+# Verified against the working tree 2026-08-28. Repo count: 89 + claude_md.
+
+meta:
+  verified: "2026-08-28"
+  workspace_repos: 89
+
+# Status vocabulary:
+#   canonical — edit here
+#   mirror    — shares history with a canonical repo; release-tracking only
+#   legacy    — dormant. DO NOT implement here. `live:` names the replacement.
+#   artifact  — compiled output, not source. Never hand-edit.
+#   stub      — empty or placeholder
+#   package   — library consumed by other repos
+
+products:
+  hospital-plus: { name: "Hospital+ (Axon)", persona: "Hospital staff, doctors, admins" }
+  medoc-plus:    { name: "Medoc+ (Vigil)",   persona: "Medoc super-admins, operators, support" }
+  docapp:        { name: "DocApp / DocAssist", persona: "Doctors, voice-driven prescribing" }
+  me:            { name: "ME (Medoc EUA)",   persona: "Patients / end users" }
+  care:          { name: "Care Dashboard",   persona: "NABH accreditation & compliance" }
+  abdm:          { name: "ABDM",             persona: "ABHA / national health ID" }
+  admin:         { name: "Admin",            persona: "Internal ops" }
+  support:       { name: "Support",          persona: "Support agents" }
+  outreach:      { name: "Outreach",         persona: "Sales / CRM" }
+  campaign:      { name: "Campaign",         persona: "Marketing campaigns" }
+  velocity:      { name: "Velocity",         persona: "Internal sprint tracking" }
+  website:       { name: "Marketing site",   persona: "Public" }
+  medoc-one:     { name: "Medoc One / claims", persona: "Claims management & settlement" }
+  platform:      { name: "Platform services", persona: "Shared infrastructure" }
+  realtime:      { name: "Realtime / WebSocket", persona: "Chat, notifications, telemedicine" }
+  sync:          { name: "Medoc Sync",       persona: "IoT prescription-capture device" }
+  radiology:     { name: "Radiology / AI research", persona: "Imaging" }
+  blockchain:    { name: "HUUD",             persona: "Hyperledger supply-chain/insurance" }
+  encryption:    { name: "Encryption family", persona: "CSFLE / in-transit crypto" }
+  packages:      { name: "Packages / libraries", persona: "Shared code" }
+  infra:         { name: "Infra / DevOps / data", persona: "Platform engineering" }
+  standalone:    { name: "Standalone",       persona: "Not part of the hospital OS" }
+
+# Coupling groups referenced by repos below. Changing a repo in a group obliges you
+# to make the corresponding change in the others, or state explicitly why not.
+couplings:
+  encryption-copies:
+    trigger: "you changed encryption/ or kms/"
+    also: [me-backend, docApp-backend, medoc_plus_backend]
+    why: "these modules are copied between services by design; fix one, fix all"
+  tenant-databases:
+    trigger: "you changed a collection name or document shape"
+    also: [HPlus-Backend, medoc_plus_backend, docApp-backend, me-backend]
+    why: "these backends share tenant databases"
+  api-contract:
+    trigger: "you changed a request/response shape"
+    also: [medoc-bruno-api-collections]
+    why: "the .bru contract and the feature Readme.md must move with the API"
+  jwt-claims:
+    trigger: "you changed JWT payload, audience, or claims"
+    also: [HPlus-Backend, medoc_plus_backend, docApp-backend, me-backend, admin-dashboard-backend, compliant-dashboard-backend]
+    why: "every JWKS-verifying service treats the audience claim as an authorization gate"
+  msf-core-consumers:
+    trigger: "you changed msf-core"
+    also: [admin-dashboard-backend]
+    why: "consumers pin by git tag — tag a release, then bump the consumer"
+
+repos:
+  # ---------------- Hospital+ / Axon ----------------
+  HPlus-Backend:
+    status: canonical
+    product: hospital-plus
+    role: "The flagship backend. 128k LOC."
+    port: 5000
+    couplings: [encryption-copies, tenant-databases, api-contract, jwt-claims]
+    hazards:
+      - "JWT fallback secrets in verifyTokens.ts and permissionMiddleware.ts — tokens are forgeable if the env var is unset."
+      - "Cloudinary credentials in source."
+    notes:
+      - "`npm run dev` runs `npm run initialize` first (seeds/derives state). Do not skip it."
+      - "Path aliases are BARE (`utils/x`), not `@/` — check tsconfig.json before importing."
+      - "Has ts-jest but never wires it; the single test file cannot execute. Wire a config before claiming a test passes."
+    reference_for:
+      - "Error/response abstractions — src/errors/"
+      - "Tenant-safe data access and transactions — src/db/db.ts"
+      - "Dockerfile shape"
+  hospital-plus-frontend:
+    status: canonical
+    product: hospital-plus
+    role: "Flutter app (Provider state management)."
+    notes: ["Consumes medoc_payment_package at `ref: main` — UNPINNED, so any push to that package is a live change here."]
+  hospital_plus_build:
+    status: artifact
+    product: hospital-plus
+    role: "Compiled Flutter web of hospital-plus-frontend (58 MB)."
+    hazards: ["Ships auth_key.pem."]
+
+  # ---------------- Medoc+ / Vigil ----------------
+  medoc_plus_backend:
+    status: canonical
+    product: medoc-plus
+    role: "Backend for the Medoc+ staff app."
+    port: 7000
+    couplings: [encryption-copies, tenant-databases, api-contract, jwt-claims]
+  MedocPlus-Frontend-V2:
+    status: canonical
+    product: medoc-plus
+    role: "Flutter staff app (nurse / paramedic / pharmacist)."
+  MedocPlusV2:
+    status: legacy
+    live: MedocPlus-Frontend-V2
+    product: medoc-plus
+    role: "The v1.0.0 predecessor."
+    hazards: ["Hardcoded Google Maps keys; session token printed to console."]
+  mplus-web-build:
+    status: artifact
+    product: medoc-plus
+    role: "Compiled Flutter web (45 MB)."
+  medoc-plus-build:
+    status: stub
+    product: medoc-plus
+    role: "Empty — mplus-web-build superseded it."
+
+  # ---------------- DocApp / DocAssist ----------------
+  docApp-backend:
+    status: canonical
+    product: docapp
+    role: "Backend. RabbitMQ producer."
+    port: 4000
+    couplings: [encryption-copies, tenant-databases, api-contract, jwt-claims]
+    notes:
+      - "Ships `npm run dev:mac` (tsx without watch) because watch mode misbehaves on macOS."
+      - "PII.txt here is the canonical PHI field list for the whole workspace."
+  DocAssist_dev_frontend:
+    status: canonical
+    product: docapp
+    role: "THE WORKING Flutter app. Ahead of the DocAssist release mirror."
+    hazards:
+      - "upload-keystore.jks is committed."
+      - "TLS validation disabled globally (badCertificateCallback => true)."
+  DocAssist:
+    status: mirror
+    live: DocAssist_dev_frontend
+    product: docapp
+    role: "Release mirror. Shares git history with DocAssist_dev_frontend but is behind it."
+    hazards: ["upload-keystore.jks is committed."]
+    notes: ["If you are unsure whether a change belongs here or in dev_frontend, ASK. Do not guess."]
+  DocAssist_Web_V2:
+    status: legacy
+    live: DocAssist_dev_frontend
+    product: docapp
+    role: "Flutter web V2 (2025-02)."
+  MedocDocappWeb:
+    status: legacy
+    live: DocAssist_dev_frontend
+    product: docapp
+    role: "Oldest repo in the workspace (2024-08)."
+  docassist_build_web:
+    status: artifact
+    product: docapp
+    role: "Compiled Flutter web of DocAssist (2025-04)."
+
+  # ---------------- ME / MedocEUA ----------------
+  me-backend:
+    status: canonical
+    product: me
+    role: "Patient backend. RabbitMQ producer."
+    port: 3000
+    couplings: [encryption-copies, tenant-databases, api-contract, jwt-claims]
+    hazards:
+      - "P0 — TRACKED .env AND src/utils/constants/env.txt WITH LIVE PRODUCTION CREDENTIALS (Atlas URI, GitHub PAT, Gemini key, RabbitMQ URL). NOT YET ROTATED."
+    notes:
+      - "`npm run build` uses `copy`, a Windows shell builtin — it FAILS on macOS/Linux. Run `npx tsc --build` and copy the env file yourself."
+      - "`npm test` needs --runInBand --forceExit; it leaks handles otherwise."
+  MedocEUA:
+    status: canonical
+    product: me
+    role: "Patient Flutter app."
+    hazards:
+      - "releasekey.jks, android/key.properties and google-services.json are committed."
+      - "TLS validation disabled globally."
+    notes: ["PINNED PRE-DART-3 (sdk >=2.19 <3.0). Will NOT build on a current Flutter toolchain."]
+  medoceua-web:
+    status: legacy
+    live: MedocEUA
+    product: me
+    role: "Web fork of the patient app."
+    hazards: ["releasekey.jks, android/key.properties and google-services.json are committed."]
+  me-web-build:
+    status: artifact
+    product: me
+    role: "Compiled Flutter web."
+    hazards: ["Google API key in main.dart.js — verify it is referrer-locked."]
+  medoceua-web-build:
+    status: artifact
+    product: me
+    role: "Earlier build artifact (v0.80.1), superseded by me-web-build."
+
+  # ---------------- Care Dashboard ----------------
+  compliant-dashboard-backend:
+    status: canonical
+    product: care
+    role: "NABH compliance backend. Bleeding-edge stack. Redis-backed RBAC."
+    port: 3030
+    couplings: [api-contract, jwt-claims]
+    hazards: ["JWT fallback secret."]
+    notes: ["Declares `test: jest` but ships NO jest config and no ts-jest — `npm test` is not runnable as written."]
+  Medoc-Care-Dashboard-Frontend:
+    status: canonical
+    product: care
+    role: "Next.js dashboard. Has docs/ with ADRs."
+    notes:
+      - "Uses HttpOnly-cookie auth (withCredentials: true, rehydrate via GET /auth/me) — NOT Bearer tokens like the older dashboards. Do not harmonise without a decision record."
+      - "Ships AGENTS.md: this is NOT the Next.js you know. Read node_modules/next/dist/docs/ first."
+    reference_for: ["Frontend architecture + ADRs — docs/"]
+
+  # ---------------- ABDM ----------------
+  medoc-abdm-dashboard-backend:
+    status: canonical
+    product: abdm
+    role: "ABDM dashboard backend (Brandi IoC container)."
+    port: 8800
+    couplings: [api-contract, jwt-claims]
+    notes: ["Declares `test: jest` but ships no jest config."]
+    reference_for: ["Machine-readable project context — brain/"]
+  medoc-abdm-dashboard-frontend:
+    status: canonical
+    product: abdm
+    role: "Next.js dashboard frontend — near-empty scaffold (1 commit)."
+    notes: ["Ships AGENTS.md: read node_modules/next/dist/docs/ before writing code."]
+  medoc-ABDM-backend:
+    status: legacy
+    product: abdm
+    role: "The ABDM GOVERNMENT GATEWAY (M1/M2/M3 certification APIs)."
+    port: 9090
+    notes:
+      - "NOT a twin of the dashboard repos — it is a DIFFERENT PRODUCT. Do not merge or harmonise them."
+
+  # ---------------- Admin ----------------
+  admin-dashboard-backend:
+    status: canonical
+    product: admin
+    role: "Admin backend. ClickHouse action logs. The ONLY msf-core consumer."
+    port: 6000
+    couplings: [api-contract, jwt-claims, msf-core-consumers]
+    hazards: ["JWT fallback secrets."]
+  Admin-Dashboard-Frontend:
+    status: canonical
+    product: admin
+    role: "Next.js admin dashboard."
+    hazards: ["Tracked src/constants/env.txt."]
+    notes: ["Ships AGENTS.md: read node_modules/next/dist/docs/ before writing code."]
+  admin-panel-backendV2:
+    status: legacy
+    live: admin-dashboard-backend
+    product: admin
+    role: "Intermediate generation (last touched 2025-05)."
+    hazards: ["Hardcoded MongoDB Atlas credentials in source."]
+  adminPanel-Backend:
+    status: legacy
+    live: admin-dashboard-backend
+    product: admin
+    role: "Generation 1 (last touched 2025-02)."
+    hazards: ["Hardcoded Atlas credentials + JWT fallback secret."]
+
+  # ---------------- Support ----------------
+  Support-Dashboard-Backend:
+    status: canonical
+    product: support
+    role: "Support backend."
+    port: 6001
+    couplings: [api-contract, jwt-claims]
+    notes: ["BEST TEST SUITE IN THE WORKSPACE (10 tests, test-setup.ts, @/ moduleNameMapper). Copy this harness for any new backend test suite."]
+    reference_for: ["Backend test harness scaffold"]
+  Medoc-Support-Dashboard:
+    status: canonical
+    product: support
+    role: "Next.js support dashboard."
+
+  # ---------------- Outreach ----------------
+  Medoc-Outreach-Backend:
+    status: canonical
+    product: outreach
+    role: "Sales/CRM backend."
+    port: 7001
+    couplings: [api-contract, jwt-claims]
+  Medoc-Outreach-Frontend:
+    status: canonical
+    product: outreach
+    role: "Next.js CRM frontend."
+  outreach_medoc_backend:
+    status: legacy
+    live: Medoc-Outreach-Backend
+    product: outreach
+    role: "Predecessor backend (last touched 2026-04)."
+    hazards: ["Unauthenticated GET /dbString returns the live MONGODB_URI.", "WhatsApp key fallback."]
+  Outreach-Dashboard-Frontend:
+    status: legacy
+    live: Medoc-Outreach-Frontend
+    product: outreach
+    role: "Predecessor Next.js frontend (2026-03)."
+    hazards: ["Tracked env.txt."]
+    notes: ["Has the RICHEST docs/ in the outreach line — good domain reference even though the code is dead."]
+
+  # ---------------- Campaign ----------------
+  Campaign-Dashboard-Backend:
+    status: canonical
+    product: campaign
+    role: "Marketing campaign backend."
+    port: 7001
+    couplings: [api-contract, jwt-claims]
+  Campaign-Dashboard-Frontend:
+    status: canonical
+    product: campaign
+    role: "Next.js campaign frontend."
+    hazards: ["Tracked src/constants/env.txt."]
+
+  # ---------------- Velocity ----------------
+  Medoc-Velocity-Backend:
+    status: canonical
+    product: velocity
+    role: "Internal sprint/task tracking backend (gamified)."
+    port: 6001
+    couplings: [api-contract, jwt-claims]
+    notes: ["Production Docker stage hardcodes node:22 / node:20 rather than the ARG NODE_VERSION pin."]
+  Medoc-Velocity-Frontend:
+    status: canonical
+    product: velocity
+    role: "Next.js sprint tracker."
+    hazards: ["~355 MB of badge PNGs (12-17 MB each) duplicated between src/assets/ and public/. Optimise before adding assets."]
+    notes: ["Ships AGENTS.md: read node_modules/next/dist/docs/ before writing code."]
+
+  # ---------------- Marketing site ----------------
+  Medoc-Main-Website-Backend:
+    status: canonical
+    product: website
+    role: "Marketing site backend (Prisma, not the native Mongo driver)."
+    port: 7001
+    couplings: [api-contract]
+  Medoc-Main-Website:
+    status: canonical
+    product: website
+    role: "Next.js marketing site (72k LOC, ~220 MB assets)."
+    hazards: ["Tracked src/lib/constants/env.txt."]
+
+  # ---------------- Medoc One / claims ----------------
+  MedocOne_backend:
+    status: canonical
+    product: medoc-one
+    role: "Claims backend. NOTE the package name is claim_management_backend."
+    port: 7777
+    couplings: [api-contract, jwt-claims]
+    hazards:
+      - "Tracked Constants.txt and env.txt (x2)."
+      - "Unauthenticated GET /dbString returns the live MONGODB_URI."
+      - "Azure connection string in source."
+  Medoc-One-Frontend:
+    status: canonical
+    product: medoc-one
+    role: "Next.js unified shell. Targets the backend on :7777."
+  Medoc-One-Backend:
+    status: legacy
+    live: MedocOne_backend
+    product: medoc-one
+    role: "Predecessor claims backend."
+    port: 7001
+    hazards: ["Tracked env.txt.", "Unauthenticated GET /dbString leaks the Mongo URI."]
+    notes: ["Its package.json name is still `outreach_medoc_backend` — copy-paste heritage. Do not let that mislead you about what it is."]
+  Claim_management_backend:
+    status: legacy
+    live: MedocOne_backend
+    product: medoc-one
+    role: "Earlier claims backend for the MediNetSettle line."
+    port: 8761
+    hazards: ["Tracked Constants.txt."]
+  MediNetSettle-Website:
+    status: canonical
+    product: medoc-one
+    role: "Next.js marketing site for the claims-settlement product. Standalone — no backend wired."
+
+  # ---------------- Platform / shared services ----------------
+  medoc-auth-service:
+    status: canonical
+    product: platform
+    role: "THE IDENTITY AUTHORITY. Signs RS256 JWTs, publishes JWKS, owns RBAC."
+    port: 4003
+    couplings: [jwt-claims, api-contract]
+    notes:
+      - "NO package-lock.json — `npm ci` FAILS here. Use `npm install`, then `npm run generate:keys` before first boot."
+      - "PRIVATE_KEY_PATH and PUBLIC_KEY_PATH are required env keys; the service throws at boot without them."
+      - "Declares `test: jest` but ships no jest config and no ts-jest."
+    reference_for: ["Service structure, env validation (EnvConfig singleton), DI"]
+  medoc-upload-service:
+    status: canonical
+    product: platform
+    role: "File upload (Azure Blob + Cloudinary + pdf-lib)."
+  Azure_upload_service_backend:
+    status: legacy
+    live: medoc-upload-service
+    product: platform
+    role: "Upload-service predecessor."
+    port: 4001
+    hazards: ["Tracked env.txt.", "Hardcoded Atlas credentials."]
+  medoc-patient-service:
+    status: canonical
+    product: platform
+    role: "Patient-domain extraction, in progress. ESM (type: module)."
+    port: 4000
+  medoc-opd-service:
+    status: canonical
+    product: platform
+    role: "OPD appointment microservice (RabbitMQ FIFO). Extracted from HPlus."
+    port: 3001
+    hazards: ["NO AUTH MIDDLEWARE YET — every route is unauthenticated."]
+  medoc-ipd-service:
+    status: stub
+    product: platform
+    role: "Empty stub, sibling of medoc-opd-service."
+  medoc-workforce-management-service:
+    status: canonical
+    product: platform
+    role: "HRMS microservice."
+    hazards: ["JWT fallback secret on the feature branch."]
+    notes: ["main is a STUB. The real code lives on the unmerged branch `feat/setup-hr-workforce`."]
+  Medoc-api-gateway:
+    status: canonical
+    product: platform
+    role: "Kong API gateway."
+    notes: ["main is a STUB. The real code lives on the unmerged branch `BADA-51-…`."]
+  medoc-redis-service:
+    status: stub
+    product: platform
+    role: "Empty stub."
+  whatsapp-delivery-service:
+    status: canonical
+    product: platform
+    role: "RabbitMQ → WhatsApp consumer."
+    notes: ["Tests compile through tsconfig.test.json, NOT tsconfig.json."]
+    reference_for: ["Resilient messaging — src/rabbitmqManager.ts", "Env validation (EnvConfig singleton)"]
+  medoc-face-auth-service:
+    status: canonical
+    product: platform
+    role: "Face recognition (Python: DeepFace + ChromaDB + FastAPI/Flask, Docker)."
+  medoc-backend-health-check:
+    status: canonical
+    product: platform
+    role: "Uptime monitoring."
+    hazards: ["Tracked backend/.env."]
+  AI-Backend:
+    status: legacy
+    product: platform
+    role: "'docAI' microservice — voice transcription (OpenAI) + prescription generation (Gemini)."
+    port: 2000
+    hazards:
+      - "Tracked env.txt; hardcoded OpenAI and Atlas credentials."
+      - "AI ROUTES ARE UNAUTHENTICATED."
+    notes: ["Missing dependencies — will not `npm ci`."]
+  Medoc-voice:
+    status: legacy
+    product: platform
+    role: "Flask voice prototype."
+    port: 5000
+    hazards: ["Tracked .env.", "A committed 362 MB Windows virtualenv."]
+
+  # ---------------- Realtime ----------------
+  web_sockets_server:
+    status: canonical
+    product: realtime
+    role: "Chat + notifications (RabbitMQ) + telemedicine WebRTC."
+    port: 7001
+    hazards: ["Unauthenticated GET /dbString leaks the Mongo URI.", "WebSocket auth by query-param only."]
+    notes: ["The real integration docs are in FLUTTER_INTEGRATION_GUIDE.md, not the README."]
+  medoc-realtime:
+    status: legacy
+    live: web_sockets_server
+    product: realtime
+    role: "Predecessor realtime server."
+    hazards: ["Atlas credential fallback.", "Mongo URI written to logs."]
+    notes: ["DOES NOT BUILD — missing directories."]
+
+  # ---------------- Medoc Sync ----------------
+  DA-Sync-Server:
+    status: canonical
+    product: sync
+    role: "Cloud backend for the sync device (MQTT + RabbitMQ + Gemini)."
+    port: 8000
+  medoc-sync-device:
+    status: canonical
+    product: sync
+    role: "ESP32-S3 firmware (PlatformIO / Arduino)."
+    hazards: ["Hardcoded MQTT credentials in src/mqtt/mqtt_manager.cpp.", "TLS disabled."]
+  medoc-sync-website:
+    status: canonical
+    product: sync
+    role: "Next.js static marketing site."
+
+  # ---------------- Radiology ----------------
+  RADICOM:
+    status: legacy
+    product: radiology
+    role: "DICOM ingestion microservice (Azure Blob)."
+    port: 4001
+    hazards: ["Tracked env.txt; hardcoded Atlas credentials.", "AUTH MIDDLEWARE IS FULLY COMMENTED OUT."]
+    notes: ["Dockerfile is an empty stub."]
+  Monarcs:
+    status: canonical
+    product: radiology
+    role: "Radiology-AI research (Python / Streamlit / PyTorch)."
+    notes: ["main is a SKELETON. The real work lives on unmerged branches."]
+
+  # ---------------- Blockchain ----------------
+  hudd-complete:
+    status: legacy
+    product: blockchain
+    role: "Hyperledger Fabric prototype (patient / insurance / research / supply-chain)."
+    port: 3131
+    hazards: ["~30 committed PEM certificates and private keys (demo Fabric network).", "Hardcoded Atlas credentials."]
+    notes: ["Will not build — missing dependencies. mongodb driver pinned at 4.0.0, the workspace outlier."]
+  huud-supply-chain:
+    status: legacy
+    product: blockchain
+    role: "Earlier Fabric chaincode spike. No build config."
+
+  # ---------------- Encryption ----------------
+  encryption_medoc:
+    status: legacy
+    product: encryption
+    role: "CSFLE library v1, canonical source (Azure Key Vault KMS)."
+    hazards: ["TRACKED .env WITH AZURE KMS CREDENTIALS.", "Hardcoded client secret in source.", "Committed obfuscated dist/."]
+  encryption_medoc_pkg:
+    status: legacy
+    live: encryption_medoc
+    product: encryption
+    role: "The packaged/dist artifact of encryption_medoc."
+    hazards: ["Tracked .env.", "Committed 13 MB ELF binary."]
+  Schema-Encryption:
+    status: legacy
+    product: encryption
+    role: "Docs-only field/collection catalogue."
+  encryption_in_action:
+    status: stub
+    product: encryption
+    role: "Empty stub — intended implementation companion to Schema-Encryption."
+  medoc-chalawa-web-package:
+    status: package
+    product: encryption
+    role: "Chalawa browser Web-Crypto library (AES-GCM + ECDH)."
+    notes: ["No tests."]
+  medoc-chalawa-node-package:
+    status: package
+    product: encryption
+    role: "Intended Node half of chalawa."
+    notes: ["THE REPO NAME LIES: it currently holds the WEB package verbatim (package name is `chalawa-web`). The node implementation must be written from scratch."]
+  medoc-chalawa-flutter-package:
+    status: package
+    product: encryption
+    role: "Chalawa Flutter/Dart library (DH RFC-5114)."
+    notes: ["No checked-out consumer."]
+
+  # ---------------- Packages ----------------
+  msf-core:
+    status: package
+    product: packages
+    role: "Medoc Standard Forms engine. Pure TypeScript, zero IO, 0 `any`, real tests."
+    couplings: [msf-core-consumers]
+    notes: ["Jest matches ONLY **/__tests__/**/*.test.ts under src/ — a *.test.ts outside a __tests__ folder is SILENTLY SKIPPED, not failed."]
+    reference_for: ["THE EXEMPLAR of this codebase. Pure domain logic, tests, docs."]
+  -medoc-health-cloudinary-multer-storage:
+    status: package
+    product: packages
+    role: "Cloudinary Multer storage engine. Consumed by 6 backends (note the LEADING DASH in the repo name)."
+    notes: ["Credentials are the consumer's responsibility, not this package's."]
+  medoc_payment_package:
+    status: package
+    product: packages
+    role: "Flutter payment-gateway wrapper (PhiCommerce / PayPhi)."
+    notes: ["hospital-plus-frontend consumes this at `ref: main` — UNPINNED. Any push here is a live change to Hospital+."]
+
+  # ---------------- Infra / data ----------------
+  Medoc_DevOPs:
+    status: canonical
+    product: infra
+    role: "Terraform (azurerm ~>3.0) + Ansible + Jenkins pipelines."
+  medoc-docker-repository:
+    status: canonical
+    product: infra
+    role: "ClickHouse + Redis container configs."
+  medoc-bruno-api-collections:
+    status: canonical
+    product: infra
+    role: "API contracts — 768 .bru files (~616 requests). READ-ONLY for frontend devs; backend team pushes."
+    hazards: ["Live JWTs in environments/medoc.bru."]
+  Medoc_Vital:
+    status: legacy
+    product: infra
+    role: "Minikube/K8s single-VM deploy for the 'Vital' suite."
+    hazards:
+      - "CRITICAL — POPULATED SECRETS in vital/backends/doc-bknd/env.txt and hplus-backend/secrets.yml (JWT secrets, OpenAI and Gemini keys)."
+      - "Public VM IP in the README."
+  vital:
+    status: stub
+    product: infra
+    role: "Empty stub — intended Vital model repo."
+  diagnostics:
+    status: canonical
+    product: infra
+    role: "Lab-test reference dataset (16 JSON files). No PHI."
+    notes: ["Filenames contain typos — match them exactly rather than correcting them in code."]
+  Devops_templates:
+    status: stub
+    product: infra
+    role: "Placeholder (single file 'aaa')."
+  cms-frontend:
+    status: stub
+    product: infra
+    role: "Empty — unborn main branch."
+  MedocHealth-DevOpsWeb:
+    status: stub
+    product: infra
+    role: "Empty — unborn main branch."
+
+  # ---------------- Standalone ----------------
+  Edebo-appbuild:
+    status: canonical
+    product: standalone
+    role: "Expo/React-Native 'Aesthetic3D' 3D face-scan app (Kiri Engine + Razorpay). Monorepo (app + server/)."
+    notes: ["UNRELATED to the hospital platform. The multi-tenancy, PHI and ABDM rules do not apply here."]
+  ref-flutter-app:
+    status: canonical
+    product: standalone
+    role: "Internal training/reference app 'FormFlow'."
+    notes: ["main is LICENSE-only. The code lives on two unmerged branches: origin/frontend and origin/new/dev."]

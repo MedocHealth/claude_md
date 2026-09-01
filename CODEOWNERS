@@ -1,0 +1,29 @@
+# CODEOWNERS — claude_md
+#
+# This repo defines how 9 developers and their agents understand 89 repositories.
+# A wrong line here propagates to every session on the team, so every change is reviewed.
+#
+# Review is owned by @MedocHealth/claudeowner. Anyone may open a PR; a member of that team
+# approves.
+#
+# PRECONDITION: the team must exist AND have write access to this repository. GitHub
+# silently ignores a CODEOWNERS line naming a team that lacks write access — no reviewer is
+# assigned and no error is shown. Verify once, in the repo's Settings > Collaborators and
+# teams, or via: gh api orgs/MedocHealth/teams/claudeowner/repos/MedocHealth/claude_md
+
+# Default owner for everything in this repo.
+*                       @MedocHealth/claudeowner
+
+# Highest blast radius, called out so the intent survives a future split:
+#   repos.yaml       — one edit rewrites 89 repositories' CLAUDE.md
+#   managed-policy/  — changes the rules on every developer machine (and must be
+#                      re-deployed by hand; it does not reach anyone via git pull)
+#   scripts/         — the generator and the pre-commit guard
+/repos.yaml             @MedocHealth/claudeowner
+/managed-policy/        @MedocHealth/claudeowner
+/scripts/               @MedocHealth/claudeowner
+
+# Reference material — same owner today. If you later want a wider set of approvers here
+# than on the three paths above, split this into a second team.
+/brain/                 @MedocHealth/claudeowner
+/WORKSPACE-MAP.md       @MedocHealth/claudeowner

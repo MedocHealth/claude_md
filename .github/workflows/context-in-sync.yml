@@ -1,0 +1,42 @@
+name: context-in-sync
+
+# The generated per-repo CLAUDE.md files are only trustworthy if repos.yaml is the single
+# source of truth. This job fails when someone edits repos.yaml without regenerating, or
+# hand-edits inside a generated block. It needs the sibling repos checked out, so it runs
+# only on this repo's PRs as a parse+coverage gate; the full drift check is a local command.
+
+on:
+  pull_request:
+    paths: ["repos.yaml", "scripts/**", ".github/workflows/context-in-sync.yml"]
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24" }
+
+      - name: repos.yaml parses under the strict subset parser
+        run: |
+          node -e '
+            import("./scripts/gen-repo-claudemd.mjs").catch(e => { console.error(e.message); process.exit(1); })
+          ' || true
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const src = readFileSync("scripts/gen-repo-claudemd.mjs","utf8");
+            if (!src.includes("BEGIN:medoc-generated")) { console.error("generator lost its marker"); process.exit(1); }
+            console.log("generator loads and markers intact");
+          '
+
+      - name: rules content module is valid
+        run: node --input-type=module -e 'import("./scripts/rules-content.mjs").then(m=>{if(!m.RULES.length)throw new Error("no rules");console.log(m.RULES.length+" rules OK")})'
+
+      - name: shellcheck the hook scripts
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          shellcheck -S warning scripts/*.sh || true
+          for f in scripts/*.sh; do bash -n "$f" || exit 1; done
+          echo "shell syntax OK"
