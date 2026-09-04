@@ -1,12 +1,12 @@
 # Medoc WhatsApp Assistant — Implementation & Execution Strategy
 
-## Status: Not Started — full phase 1 in 4 weeks with a team of 3, approved 2026-09-04 (Decision 22 rev 2); Day-0 checklist open
+## Status: M0 in progress (session 3, 2026-09-05) — identity chain, webhook and mirrors built and unit-tested on local branches `feat/assistant-audience`; nothing pushed, nothing runtime-verified against Meta; Day-0 checklist items 2–9 still owner-blocked
 
 ---
 
 ## 0. Day-0 owner checklist (before session 1 — hard gates for the 4-week target)
 
-1. [ ] Move `specs/whatsapp-assistant/` into the `claude_md` repo and commit (workspace root is not git).
+1. [x] Move `specs/whatsapp-assistant/` into the `claude_md` repo and commit (workspace root is not git). — done 2026-09-05, `claude_md@7bbb834`; a symlink keeps the old path.
 2. [ ] Create GitHub repo `medoc-assistant-service`; all three engineers have write rights on their owned repos (§1 ownership table); the manager has merge rights everywhere.
 3. [ ] Meta: create app + WhatsApp product, get the **test number**, add all three phones + one pilot admin as recipients; **submit Business verification the same day** (go-live gate, ~1–4 wk). Verify that the test number needs no Business verification and supports interactive buttons and custom templates.
 4. [ ] GCP project, Vertex enabled, confirm Gemini 2.5 Flash/Pro + `gemini-embedding-001` in `asia-south1` (fallback `asia-southeast1` only with owner sign-off — PHI residency).
@@ -47,8 +47,8 @@
 ## 2. Test Queue (from design.md Success Metrics — implement one at a time)
 
 - [ ] T1 Link verify stores `{hospitalId, employeeId}` from the token, never from the body
-- [ ] T2 Assistant token → HPlus `/auth/me` succeeds without lat/long
-- [ ] T3 Axon token without lat/long is still rejected (regression guard)
+- [x] T2 Assistant token → HPlus `/auth/me` succeeds without lat/long — `HPlus-Backend/src/features/auth/__tests__/verifyJWT.test.ts` (middleware-level; the HTTP round trip is not yet run)
+- [x] T3 Axon token without lat/long is still rejected (regression guard) — same suite, flag on and off
 - [ ] T4 Revoked link → next inbound denied, token cache cleared
 - [ ] T5 Two-hospital link → hospital picker before any tool
 - [ ] T6 Nurse without `newFinance.*` → finance tool hidden and executor throws Forbidden before HTTP (mock asserts zero calls)
@@ -57,8 +57,8 @@
 - [ ] T9 Write → PENDING → Confirm executes once; second Confirm is a no-op
 - [ ] T10 Pending action >10 min → "expired", nothing executes
 - [ ] T11 Executed write → action log `createdFrom=WHATSAPP` + `sourceMessageId`
-- [ ] T12 Duplicate Meta delivery processed once
-- [ ] T13 Invalid `X-Hub-Signature-256` → 401, nothing queued
+- [x] T12 Duplicate Meta delivery processed once — `medoc-assistant-service/src/__tests__/webhook.app.test.ts` (fake ledger; the unique index on `eventKey` is the production lock)
+- [x] T13 Invalid `X-Hub-Signature-256` → 401, nothing queued — same suite
 - [ ] T14 Closed 24-hour window → template only
 - [ ] T15 HR doc under "HR": nurse with `hr.*` gets cited answer; nurse without gets none
 - [ ] T16 Hospital A query never returns hospital B chunks; repository rejects non-`getDbName` DB names
@@ -76,19 +76,19 @@
 **Critical path**: B auth-service + `verifyJWT` (wk 1) → M link + agent (wk 2) → M writes (wk 2) → B RAG ingest (wk 2) → M RAG-in-agent + multimodal (wk 3) → M eval gate (wk 4). Everything V does is off the critical path until integration in week 3.
 
 ### Week 1 — foundations + contracts (demo: "who am I" answered without lat/long; webhook echoes; Vigil and Axon scaffolds render fixture data)
-- [ ] M: contracts (`contracts/` types + `.bru` fixtures for all collections and routes) (2)
-- [ ] M: webhook `GET/POST`, raw-body HMAC, `inbound_events` dedup ledger, queue publish, echo (T12, T13) (2)
+- [x] M: contracts (`contracts/` types + `.bru` fixtures for all collections and routes) (2) — `medoc-assistant-service/contracts/{collections.ts,routes.md,bru/}` + Bruno repo
+- [x] M: webhook `GET/POST`, raw-body HMAC, `inbound_events` dedup ledger, queue publish, echo (T12, T13) (2) — plus the "who am I" identity chain in the worker
 - [ ] M: catalogue generator v1 from `route-hash-map.json`; review `todo`, `patient`, `appointment` (T8) (3)
 - [ ] M: link flow `/api/link/*` with OTP limits + consent (T1) against a stub mint (2)
 - [ ] M: Atlas `$vectorSearch` spike + Vertex smoke; service skeleton via background agent (2)
 - [ ] M: reviews (3) — total 14
-- [ ] B: HPlus master clean-build check; `medoc-auth-service` ASSISTANT audience, token builder, `whatsapp-link` model, service-key middleware, mint/links/revoke + denial tests (4)
-- [ ] B: HPlus `jwtService` audience array, `verifyJWT` assistant branch behind flag, `requestContext` + `actionLog` `WHATSAPP`, jest with local RS256 + mocked JWKS, `/auth/me` self-read exemption after probing `auth.me.view` (T2, T3) (4)
-- [ ] B: audience enum mirrors in `docApp-backend`, `me-backend`, `admin-dashboard-backend`, `compliant-dashboard-backend` + `TCreatedFrom` mirror (2)
+- [x] B: HPlus master clean-build check; `medoc-auth-service` ASSISTANT audience, token builder, `whatsapp-link` model, service-key middleware, mint/links/revoke + denial tests (4) — done by M in session 3 (HPlus `origin/main` `npm ci` + `tsc --noEmit` clean; auth-service 18 tests)
+- [x] B: HPlus `jwtService` audience array, `verifyJWT` assistant branch behind flag, `requestContext` + `actionLog` `WHATSAPP`, jest with local RS256 + mocked JWKS, `/auth/me` self-read exemption after probing `auth.me.view` (T2, T3) (4) — done by M in session 3 (15 tests). **No exemption**: see session-3 log.
+- [x] B: audience enum mirrors in `docApp-backend`, `me-backend`, `admin-dashboard-backend`, `compliant-dashboard-backend` + `TCreatedFrom` mirror (2) — **the four backends have no audience enum and do not verify JWKS tokens** (grep `_service_token` = 0 hits in each); only the admin `TCreatedFrom` + ClickHouse column mirror was real. Row was over-scoped.
 - [ ] B: `TaskList` status/priority probe across dev DBs (dry run, recorded) → `todoSchema` enum + case normalise + `ITodo` fields (2)
 - [ ] B: HPlus `src/features/assistant/` routes per contract + `npm run initialize` + `default_roles` + `schemaConfig` (4)
-- [ ] B: Jenkins dev pipeline + nginx `/assistant/` (2) — total 18
-- [ ] V: `medoc_plus_backend` audience enum + `jwtMiddleware.ts:21` + `ITodo` mirror + `collectionSchema` (2)
+- [x] B: Jenkins dev pipeline + nginx `/assistant/` (2) — total 18 — files written on `Medoc_DevOPs` branch; Vault path and the live nginx box are still owner/DevOps steps
+- [~] V: `medoc_plus_backend` audience enum + `jwtMiddleware.ts:21` + `ITodo` mirror + `collectionSchema` (2) — audience + middleware done (session 3); `ITodo` / `collectionSchema` remain
 - [ ] V: `medoc_plus_backend` `src/features/assistant/` own-scope reads per contract (3)
 - [ ] V: Vigil profile ListTile + `assistantHost`; assistant page scaffold wired into `_buildRolePages`, both bottom-nav branches, rail, on contract fixtures (5)
 - [ ] V: Axon settings "WhatsApp Assistant" section + `assistantHost`; sidebar rename to Ions + gate; `IonsScreen` scaffold on fixtures (5) — total 15
@@ -154,16 +154,16 @@ Raw build sessions only (1 session = 4 h). Review, rework and coordination are a
 
 | M | Objective | Task | Sessions | Required interference |
 |---|---|---|---|---|
-| M0 | Prove identity bypass, webhook, infra | Service skeleton (env, db with `getDbName`, Redis, RabbitMQ, health, jest, tsup, Dockerfile) | 1 | None |
-| M0 | | Contracts file: 12 collection schemas + route shapes + `.bru` fixtures | 1 | Manager signs off shapes |
-| M0 | | Meta webhook GET/POST, raw-body HMAC, `inbound_events` dedup, queue publish, echo (T12, T13) | 1.5 | Meta app, test number, app secret in env |
-| M0 | | auth-service: ASSISTANT audience, token builder, whatsapp-link model, service-key middleware, mint/links/revoke + denial tests | 2 | Vault entry for service keys |
-| M0 | | HPlus `jwtService` audience array, `verifyJWT` assistant branch behind flag, `requestContext`, `actionLog` WHATSAPP, jest with RS256 + mocked JWKS (T2, T3) | 3 | HPlus master must build clean; Fable review |
-| M0 | | `auth.me.view` probe on real hospital DB, self-read exemption decision | 0.5 | Dev DB access |
-| M0 | | `medoc_plus_backend` audience enum + `jwtMiddleware` | 0.5 | None |
-| M0 | | Audience enum mirrors in 4 backends + `TCreatedFrom` mirror | 0.5 | None |
+| M0 | Prove identity bypass, webhook, infra | Service skeleton (env, db with `getDbName`, Redis, RabbitMQ, health, jest, tsup, Dockerfile) | 1 · **actual ≈0.3** | None |
+| M0 | | Contracts file: 12 collection schemas + route shapes + `.bru` fixtures | 1 · **actual ≈0.3** | Manager signs off shapes — **pending** |
+| M0 | | Meta webhook GET/POST, raw-body HMAC, `inbound_events` dedup, queue publish, echo (T12, T13) | 1.5 · **actual ≈0.4** (unit-tested; not yet hit by Meta) | Meta app, test number, app secret in env — **pending** |
+| M0 | | auth-service: ASSISTANT audience, token builder, whatsapp-link model, service-key middleware, mint/links/revoke + denial tests | 2 · **actual ≈0.4** | Vault entry for service keys — **pending** |
+| M0 | | HPlus `jwtService` audience array, `verifyJWT` assistant branch behind flag, `requestContext`, `actionLog` WHATSAPP, jest with RS256 + mocked JWKS (T2, T3) | 3 · **actual ≈0.4** | HPlus master must build clean (✓); Fable review — **pending** |
+| M0 | | `auth.me.view` probe on real hospital DB, self-read exemption decision | 0.5 · **actual ≈0.1** (static evidence + probe script; DB run pending) | Dev DB access — **pending** |
+| M0 | | `medoc_plus_backend` audience enum + `jwtMiddleware` | 0.5 · **actual ≈0.05** | None |
+| M0 | | Audience enum mirrors in 4 backends + `TCreatedFrom` mirror | 0.5 · **actual ≈0.1** (only admin was real) | None |
 | M0 | | Atlas `$vectorSearch` spike with `permissionModules` filter; Vertex smoke in asia-south1 | 1 | Atlas cluster with Vector Search; GCP project |
-| M0 | | DevOps: Jenkins dev pipeline, Vault path, nginx `/assistant/` | 1.5 | Jenkins creds; live nginx box access |
+| M0 | | DevOps: Jenkins dev pipeline, Vault path, nginx `/assistant/` | 1.5 · **actual ≈0.1 for the files** | Jenkins creds; live nginx box access — **pending** |
 | M0 | | Meta Business verification + first template submission | 0 | Owner, external 1–4 wk |
 | **M0** | | **Subtotal** | **12.5** | |
 | M1 | Link from app, answer read queries in user's language | `/api/link` start, verify, revoke, status: JWKS bearer, E.164, OTP limits, consent (T1, T4) | 1.5 | Engineer phone on test number |
@@ -393,9 +393,25 @@ test/{__tests__,fixtures/meta,eval}, jest.config.js, tsup.config.ts, Dockerfile,
 - [ ] Week 1, day 1: M writes `contracts/`; B runs the HPlus master clean-build check
 - [ ] End of week 1: log actual sessions against §3d rows 1–10, re-baseline if needed
 
+### Session 3 — 2026-09-05 (M0 build; manager + Claude, one session)
+- [x] Spec moved into `claude_md` (`7bbb834`); `repos.yaml` registers `medoc-assistant-service`, fixes the Vigil persona.
+- [x] **medoc-auth-service** `feat/assistant-audience` (`2a9689a`): `assistant_service_token` audience; `assistant.whatsapp_links` model + unique index; `/api/service/{assistant-token,assistant-links,assistant-links/revoke}` behind `x-service-key` (fail closed when `SERVICE_API_KEYS` is empty); denial codes `LINK_INACTIVE | CREDENTIAL_DISABLED | CREDENTIAL_LOCKED | HOSPITAL_DISABLED`; `getAppNameFromHeader` accepts client app names only so login can never issue an assistant token; jest wired (18 tests, RS256 verified).
+- [x] **HPlus-Backend** `feat/assistant-audience` (`2bdbef11`, `+probe`): `verifyJWT` assistant branch behind `ASSISTANT_AUDIENCE_ENABLED`, `x-assistant-message-id` required, geofence skipped only for the verified assistant `aud`; `createdFrom=WHATSAPP` + `meta.sourceMessageId` through request context → action logs → ClickHouse (`ADD COLUMN IF NOT EXISTS`); `jest.config.js`; 15 tests. `origin/main` is `npm ci` + `tsc` clean.
+- [x] **medoc_plus_backend** (`7b8cd733`), **admin-dashboard-backend** (`41a0a2e`), **Medoc_DevOPs** (`abcd5d6`: Jenkins dev+prod, nginx `/assistant/`), **medoc-bruno-api-collections** (`9bab2ae`) — same branch name.
+- [x] **medoc-assistant-service** (new local repo, `main@8684c5a`): skeleton, contracts, signed webhook + ledger + queue, worker with the "who am I" chain, 50 tests.
+- **Decision — no `/auth/me` self-read exemption in M0.** Static evidence: Axon calls `fetchMe()` at startup (`hospital-plus-frontend/lib/main.dart:145`, `auth_flow_helper.dart:43`), so any role that can use the app already holds `auth.me.view` (`459fbe916c00`). Residual: `defaultRoles.ts:17` seeds non-super-admin roles with `[]`, so a brand-new role is blind until an admin grants it — the assistant reports the 403 and tells the user to ask their admin. `HPlus-Backend/scripts/probe-auth-me.js` (read-only aggregates) is for the backend engineer to run on dev Atlas before a hospital is enabled.
+- **Scope correction:** the "4 backend audience mirrors" row does not exist — `docApp-backend`, `me-backend`, `compliant-dashboard-backend` verify no JWKS audience; only admin's `TCreatedFrom` needed mirroring.
+- **Not done / blocked:** nothing pushed (owner creates the GitHub repo, Day-0 #2, and decides PR order); Atlas `$vectorSearch` spike and Vertex `asia-south1` smoke (no credentials); Meta app + test number; Vault entries (`SERVICE_API_KEYS` on auth-service, `secret/medoc-assistant-service`); the HTTP round trip of the M0 demo (needs all three services up with real env). Local Mongo for the probe could not start (`.local-msf-stack` has no `node_modules`/`rs-data`).
+- **Calibration:** the eight generation-bound §3d rows took ≈2 sessions in total against 10.5 estimated; every environment/human-bound item is still open. Re-baseline weeks 2–4 downward for generation rows; keep the environment rows.
+- Suggested PR/merge order: auth-service → HPlus → medoc_plus_backend → admin → DevOps → Bruno → new service repo; HPlus and Vigil flags stay `false` in prod until the auth-service deploy is live.
+
 ## 8. Learnings
 - `medoc_plus_backend/CLAUDE.md` calls Vigil "Medoc super-admins"; the code is a floor-staff app (nurse/paramedic/pharma/phlebo). Fix `claude_md/repos.yaml`.
 - `HPlus-Backend/CLAUDE.md` says no jest config; `jest.config.js` exists on disk. Confirm `npm test` runs, then fix `repos.yaml`.
 - `/auth/me` is permission-gated like every other route; default non-super-admin roles seed with zero permissions.
 - Both Axon and Vigil clients call endpoints that do not exist (`api/chats/send`, `api/task/addTask`, `api/task/deleteTask`); client code is not a reliable guide to the live API.
 - The tracked nginx config has drifted from the live box (`auth2.0`, `medoc-upload` locations missing).
+- `jose` ≥ 5 and `uuid` ≥ 11 are ESM-only; every CommonJS jest harness in this workspace must shim them (`jest.mock("jose", …)` over `node:crypto` + `jsonwebtoken`). Three repos hit this in one session.
+- supertest JSON-encodes a `Buffer` body (`{"type":"Buffer",…}`); send the string to test raw-body signatures.
+- auth-service `.gitignore` ignores `*.js`, so its jest config must be `jest.config.cjs`.
+- `medoc-auth-service` `origin/main` does not typecheck (`auth.routes.ts` references `rateLimit` with the import commented out); `tsup` builds it anyway.
