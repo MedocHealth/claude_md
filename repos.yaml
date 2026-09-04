@@ -14,7 +14,7 @@
 
 meta:
   verified: "2026-08-28"
-  workspace_repos: 89
+  workspace_repos: 90
 
 # Status vocabulary:
 #   canonical — edit here
@@ -29,7 +29,7 @@ meta:
 
 products:
   hospital-plus: { name: "Hospital+ (Axon)", persona: "Hospital staff, doctors, admins" }
-  medoc-plus:    { name: "Medoc+ (Vigil)",   persona: "Medoc super-admins, operators, support" }
+  medoc-plus:    { name: "Medoc+ (Vigil)",   persona: "Floor staff: nurses, paramedics, pharmacists, phlebotomists (role string + attendance state, no RBAC layer)" }
   docapp:        { name: "DocApp / DocAssist", persona: "Doctors, voice-driven prescribing" }
   me:            { name: "ME (Medoc EUA)",   persona: "Patients / end users" }
   care:          { name: "Care Dashboard",   persona: "NABH accreditation & compliance" }
@@ -400,7 +400,8 @@ repos:
     notes:
       - "NO package-lock.json — `npm ci` FAILS here. Use `npm install`, then `npm run generate:keys` before first boot."
       - "PRIVATE_KEY_PATH and PUBLIC_KEY_PATH are required env keys; the service throws at boot without them."
-      - "Declares `test: jest` but ships no jest config and no ts-jest."
+      - "Declares `test: jest` but ships no jest config and no ts-jest on main; branch feat/assistant-audience adds jest.config.cjs + 18 tests (drop this note when merged)."
+      - "Server-to-server routes /api/service/* (x-service-key, SERVICE_API_KEYS) mint assistant_service_token and own assistant.whatsapp_links — branch feat/assistant-audience."
     reference_for: ["Service structure, env validation (EnvConfig singleton), DI"]
   medoc-upload-service:
     status: canonical
@@ -449,6 +450,18 @@ repos:
     role: "RabbitMQ → WhatsApp consumer."
     notes: ["Tests compile through tsconfig.test.json, NOT tsconfig.json."]
     reference_for: ["Resilient messaging — src/rabbitmqManager.ts", "Env validation (EnvConfig singleton)"]
+  medoc-assistant-service:
+    status: canonical
+    product: platform
+    role: "WhatsApp Assistant — Meta Cloud API webhook, identity bridge (auth-service mint → HPlus as the user, no geofence), agent + RAG workers. Spec: claude_md/specs/whatsapp-assistant/."
+    port: 4010
+    couplings: [jwt-claims, api-contract]
+    notes:
+      - "Two processes: api (webhook must ack Meta <1 s) and worker (RabbitMQ consumers). Contracts other repos code against live in contracts/."
+      - "The webhook verifies the RAW body; never add a global express.json() above /webhooks."
+      - "hospitalId comes from the link/session only; MongoDB.getCollection(name, hospitalId) validates against the registry and refuses raw _db names."
+      - "Created 2026-09-05 (M0). Local repo only until the GitHub repo exists (Day-0 checklist #2)."
+    reference_for: ["Signed-webhook + idempotency ledger (src/middlewares/meta-signature.ts, src/services/inbound-ledger.service.ts)", "Jest harness that shims ESM-only deps (jose, uuid)"]
   medoc-face-auth-service:
     status: canonical
     product: platform
