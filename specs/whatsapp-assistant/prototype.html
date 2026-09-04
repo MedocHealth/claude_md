@@ -1,0 +1,689 @@
+<title>Medoc Assistant Prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground:#F1F3F1; --surface:#FFFFFF; --surface-2:#E9EEEB; --ink:#15221F; --ink-2:#3B4744; --muted:#5D6B67; --line:#D5DCD8;
+    --accent:#0F7B6C; --accent-ink:#0B5A4F; --accent-soft:#DCEFEA; --amber:#B7791F; --amber-soft:#F6ECD8; --danger:#A8433A; --danger-soft:#F5E1DE;
+    --chat-ground:#E5DDD3; --bubble-in:#FFFFFF; --bubble-out:#D9F1E4; --wa-head:#0F7B6C; --wa-head-ink:#FFFFFF;
+    --trace-bg:#0E1614; --trace-ink:#C9D6D1; --trace-dim:#6E7F79; --trace-ok:#6ED3B8; --trace-warn:#E0A64A; --trace-bad:#F08A80;
+    --shadow:0 1px 2px rgba(21,34,31,.08), 0 8px 24px rgba(21,34,31,.08); color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --ground:#0F1614; --surface:#182220; --surface-2:#1F2B28; --ink:#E6ECE9; --ink-2:#C3CDC9; --muted:#95A39E; --line:#2A3634;
+    --accent:#4FB69F; --accent-ink:#8FD6C5; --accent-soft:#1D3833; --amber:#E0A64A; --amber-soft:#3A2E17; --danger:#E08078; --danger-soft:#3A1F1C;
+    --chat-ground:#0B1210; --bubble-in:#1F2B28; --bubble-out:#1E3A31; --wa-head:#1F2B28; --wa-head-ink:#E6ECE9;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35); color-scheme:dark; } }
+  :root[data-theme="dark"] {
+    --ground:#0F1614; --surface:#182220; --surface-2:#1F2B28; --ink:#E6ECE9; --ink-2:#C3CDC9; --muted:#95A39E; --line:#2A3634;
+    --accent:#4FB69F; --accent-ink:#8FD6C5; --accent-soft:#1D3833; --amber:#E0A64A; --amber-soft:#3A2E17; --danger:#E08078; --danger-soft:#3A1F1C;
+    --chat-ground:#0B1210; --bubble-in:#1F2B28; --bubble-out:#1E3A31; --wa-head:#1F2B28; --wa-head-ink:#E6ECE9;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35); color-scheme:dark; }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink); font-family:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif; font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  h1,h2,h3 { font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif; margin:0; line-height:1.15; text-wrap:balance; }
+  button { font:inherit; color:inherit; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  code { font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-size:.88em; }
+  .eyebrow { font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:500; }
+
+  .app { display:grid; grid-template-columns: 300px 400px minmax(320px,1fr); gap:1.4rem; max-width:1320px; margin:0 auto; padding:1.4rem 1.4rem 3rem; align-items:start; }
+  .panel { background:var(--surface); border:1px solid var(--line); border-radius:8px; }
+  .panel > .ph { padding:.8rem 1rem; border-bottom:1px solid var(--line); display:flex; align-items:baseline; justify-content:space-between; gap:.6rem; }
+  .panel > .ph h2 { font-size:1rem; }
+  .panel .pb { padding:.9rem 1rem; }
+
+  /* ── controls ── */
+  .top { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:flex-end; gap:1rem; flex-wrap:wrap; }
+  .top h1 { font-size:1.6rem; }
+  .top p { margin:.2rem 0 0; color:var(--ink-2); max-width:70ch; }
+  .field { margin-bottom:.9rem; }
+  .field label { display:block; font-size:.74rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:.3rem; }
+  select, input[type=text] { width:100%; padding:.5rem .6rem; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink); }
+  .persona { border:1px solid var(--line); border-radius:6px; padding:.6rem .7rem; background:var(--surface-2); font-size:.86rem; }
+  .persona b { display:block; font-weight:600; }
+  .persona .mods { display:flex; flex-wrap:wrap; gap:.25rem; margin-top:.4rem; }
+  .chip { font-family:"IBM Plex Mono",monospace; font-size:.68rem; padding:.05rem .4rem; border:1px solid var(--line); border-radius:4px; color:var(--ink-2); background:var(--surface); }
+  .chip.on { border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft); }
+  .scen { display:flex; flex-direction:column; gap:.35rem; }
+  .scen button { text-align:left; padding:.45rem .6rem; border:1px solid var(--line); background:var(--surface); border-radius:6px; cursor:pointer; font-size:.86rem; display:grid; grid-template-columns:1fr auto; gap:.5rem; align-items:center; }
+  .scen button:hover { border-color:var(--accent); background:var(--accent-soft); }
+  .scen button small { color:var(--muted); font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; }
+  .scen .grp { margin-top:.5rem; }
+  .btn { padding:.45rem .8rem; border:1px solid var(--line); border-radius:6px; background:var(--surface); cursor:pointer; font-size:.86rem; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:500; }
+  .btn.ghost { background:transparent; }
+  .btn:hover { filter:brightness(.97); }
+
+  /* ── phone ── */
+  .phone { background:#0b0f0e; border-radius:38px; padding:12px; box-shadow:var(--shadow); position:sticky; top:1rem; }
+  .screen { background:var(--chat-ground); border-radius:28px; overflow:hidden; display:flex; flex-direction:column; height:min(780px, calc(100vh - 3rem)); }
+  .wa-head { background:var(--wa-head); color:var(--wa-head-ink); padding:.9rem 1rem .7rem; display:flex; gap:.7rem; align-items:center; }
+  .wa-head .av { width:36px; height:36px; border-radius:50%; background:var(--accent-soft); color:var(--accent-ink); display:grid; place-items:center; font-weight:700; font-family:"Bricolage Grotesque",sans-serif; }
+  .wa-head b { display:block; font-weight:600; }
+  .wa-head small { opacity:.8; font-size:.74rem; }
+  .thread { flex:1; overflow-y:auto; padding:.8rem .7rem; display:flex; flex-direction:column; gap:.35rem; background-image:radial-gradient(circle at 20% 10%, rgba(255,255,255,.12), transparent 40%); }
+  .msg { max-width:86%; padding:.45rem .6rem .35rem; border-radius:10px; box-shadow:0 1px 1px rgba(0,0,0,.1); font-size:.9rem; line-height:1.4; overflow-wrap:anywhere; }
+  .msg.in { background:var(--bubble-in); align-self:flex-start; border-top-left-radius:3px; }
+  .msg.out { background:var(--bubble-out); align-self:flex-end; border-top-right-radius:3px; }
+  .msg .time { display:block; text-align:right; font-size:.66rem; color:var(--muted); margin-top:.15rem; }
+  .msg .card { border-left:3px solid var(--accent); padding:.3rem .5rem; margin:.3rem 0; background:rgba(15,123,108,.06); border-radius:3px; }
+  .msg .card b { display:block; }
+  .msg .kv { display:grid; grid-template-columns:auto 1fr; gap:.1rem .6rem; font-size:.84rem; }
+  .msg .kv span:nth-child(odd) { color:var(--muted); }
+  .msg .btns { display:flex; flex-direction:column; gap:.3rem; margin:.45rem -.3rem -.1rem; }
+  .msg .btns button { border:0; border-top:1px solid var(--line); background:transparent; padding:.45rem; color:var(--accent-ink); font-weight:500; cursor:pointer; border-radius:0; }
+  .msg .btns button:hover { background:var(--accent-soft); }
+  .msg .btns button:disabled { color:var(--muted); cursor:default; }
+  .msg .list { margin:.4rem 0 0; }
+  .msg .list button { display:block; width:100%; text-align:left; border:1px solid var(--line); background:var(--surface); border-radius:6px; padding:.4rem .55rem; margin-top:.3rem; cursor:pointer; }
+  .msg .list button:hover { border-color:var(--accent); }
+  .msg .list button small { display:block; color:var(--muted); font-size:.74rem; }
+  .msg .doc { display:flex; gap:.5rem; align-items:center; background:var(--surface-2); border-radius:6px; padding:.4rem .5rem; margin:.2rem 0; }
+  .msg .doc .ic { width:28px; height:34px; border-radius:3px; background:var(--danger); color:#fff; font-size:.6rem; display:grid; place-items:center; font-weight:600; }
+  .msg .voice { display:flex; align-items:center; gap:.4rem; }
+  .msg .voice .wave { flex:1; height:18px; background:repeating-linear-gradient(90deg, var(--accent) 0 2px, transparent 2px 5px); opacity:.6; border-radius:2px; }
+  .msg .cite { font-size:.76rem; color:var(--muted); border-top:1px dashed var(--line); margin-top:.3rem; padding-top:.25rem; }
+  .sys { align-self:center; font-size:.7rem; color:var(--ink-2); background:rgba(255,255,255,.55); padding:.15rem .6rem; border-radius:6px; margin:.3rem 0; }
+  :root[data-theme="dark"] .sys, :root:not([data-theme="light"]) .sys { background:rgba(255,255,255,.08); }
+  .typing { align-self:flex-start; background:var(--bubble-in); border-radius:10px; padding:.4rem .7rem; font-size:.8rem; color:var(--muted); }
+  .composer { display:flex; gap:.4rem; padding:.5rem .6rem .7rem; align-items:center; background:var(--surface-2); }
+  .composer input { flex:1; padding:.55rem .8rem; border-radius:20px; border:1px solid var(--line); background:var(--surface); }
+  .composer button { width:38px; height:38px; border-radius:50%; border:0; background:var(--surface); cursor:pointer; display:grid; place-items:center; font-size:1rem; }
+  .composer button.send { background:var(--accent); color:#fff; }
+  .composer button:hover { filter:brightness(.95); }
+  .attach-menu { position:absolute; bottom:70px; left:60px; background:var(--surface); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); padding:.4rem; display:none; z-index:5; width:260px; }
+  .attach-menu.open { display:block; }
+  .attach-menu button { display:block; width:100%; text-align:left; border:0; background:transparent; padding:.45rem .5rem; border-radius:6px; cursor:pointer; font-size:.86rem; }
+  .attach-menu button:hover { background:var(--accent-soft); }
+  .attach-menu small { display:block; color:var(--muted); font-size:.72rem; }
+  .screen-wrap { position:relative; }
+
+  /* ── right: tabs ── */
+  .tabs { display:flex; gap:0; border-bottom:1px solid var(--line); }
+  .tabs button { flex:1; padding:.6rem .4rem; border:0; background:transparent; cursor:pointer; font-size:.84rem; color:var(--muted); border-bottom:2px solid transparent; }
+  .tabs button.on { color:var(--accent-ink); border-bottom-color:var(--accent); font-weight:500; }
+  .tabpane { display:none; }
+  .tabpane.on { display:block; }
+  .trace { background:var(--trace-bg); color:var(--trace-ink); font-family:"IBM Plex Mono",monospace; font-size:.74rem; line-height:1.55; padding:.8rem .9rem; height:560px; overflow:auto; border-radius:0 0 8px 8px; }
+  .trace .t { color:var(--trace-dim); }
+  .trace .ok { color:var(--trace-ok); }
+  .trace .warn { color:var(--trace-warn); }
+  .trace .bad { color:var(--trace-bad); }
+  .trace .turn { border-top:1px dashed #2a3a36; margin-top:.5rem; padding-top:.4rem; color:#fff; }
+  .feed { height:560px; overflow:auto; padding:.6rem .9rem; }
+  .feed .item { border:1px solid var(--line); border-radius:6px; padding:.5rem .7rem; margin:.4rem 0; font-size:.86rem; background:var(--surface); }
+  .feed .item .k { font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--accent-ink); font-weight:600; }
+  .feed .item .m { color:var(--muted); font-size:.76rem; }
+  .feed .empty { color:var(--muted); font-size:.86rem; padding:1rem .2rem; }
+  .audit table { width:100%; border-collapse:collapse; font-size:.78rem; }
+  .audit th, .audit td { text-align:left; padding:.35rem .4rem; border-bottom:1px solid var(--line); vertical-align:top; }
+  .audit th { font-size:.66rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:500; }
+  .audit td code { font-size:.72rem; }
+  .ions-head { display:flex; gap:.4rem; padding:.5rem .9rem 0; }
+  .ions-head span { font-size:.74rem; padding:.15rem .5rem; border:1px solid var(--line); border-radius:999px; color:var(--muted); }
+  .ions-head span.on { color:var(--accent-ink); border-color:var(--accent); }
+  .note { font-size:.8rem; color:var(--muted); padding:.5rem .9rem .7rem; border-top:1px solid var(--line); }
+
+  @media (max-width: 1100px) { .app { grid-template-columns: 1fr 400px; } .right { grid-column:1 / -1; } }
+  @media (max-width: 760px) { .app { grid-template-columns: 1fr; padding:1rem; } .phone { position:static; } .screen { height:640px; } .right { grid-column:auto; } }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+</style>
+
+<div class="app">
+  <div class="top">
+    <div>
+      <span class="eyebrow">Interactive prototype · mock data, no backend</span>
+      <h1>Medoc Assistant on WhatsApp</h1>
+      <p>Type into the phone, or pick a scenario. Switch persona to feel how role-based access changes what the assistant offers. The right panel shows what happens behind each message, what lands in Axon's Ions feed, and the audit log.</p>
+    </div>
+    <div style="display:flex; gap:.5rem;">
+      <button class="btn ghost" id="btnReset">Reset conversation</button>
+    </div>
+  </div>
+
+  <!-- ── LEFT: controls ── -->
+  <aside class="panel left">
+    <div class="ph"><h2>Who is texting</h2></div>
+    <div class="pb">
+      <div class="field"><label for="persona">Persona</label>
+        <select id="persona"></select></div>
+      <div class="persona" id="personaCard"></div>
+      <div class="field" style="margin-top:.9rem"><label for="lang">Reply language</label>
+        <select id="lang"><option value="auto">Mirror the message (auto)</option><option value="en">English</option><option value="hi">Hindi (Hinglish)</option></select></div>
+    </div>
+    <div class="ph"><h2>Scenarios</h2><span class="eyebrow">tap to send</span></div>
+    <div class="pb scen" id="scenarios"></div>
+  </aside>
+
+  <!-- ── CENTER: phone ── -->
+  <div class="phone">
+    <div class="screen-wrap">
+    <div class="screen">
+      <div class="wa-head"><div class="av">M</div><div><b>Medoc Assistant</b><small id="waSub">Business account · Sunrise Hospitals</small></div></div>
+      <div class="thread" id="thread"></div>
+      <div class="composer">
+        <button id="btnAttach" title="Attach">＋</button>
+        <input type="text" id="input" placeholder="Type a message" autocomplete="off">
+        <button id="btnMic" title="Send a voice note">🎤</button>
+        <button class="send" id="btnSend" title="Send">➤</button>
+      </div>
+    </div>
+    <div class="attach-menu" id="attachMenu">
+      <button data-att="leave">📄 Leave_Policy_2026.pdf<small>HR policy, 6 pages, text layer</small></button>
+      <button data-att="nabh">📄 NABH_Chapter_AAC_SOPs.pdf<small>Quality SOPs, 42 pages</small></button>
+      <button data-att="vendor">📊 Q2_Vendor_Contracts.xlsx<small>Finance / vendor terms</small></button>
+      <button data-att="scan">🖼 Discharge_summary_scan.jpg<small>Photo of a paper discharge summary</small></button>
+      <button data-att="register">🖼 Photo of vitals register page<small>Handwritten, Ward B</small></button>
+    </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: behind the scenes ── -->
+  <aside class="panel right">
+    <div class="tabs">
+      <button class="on" data-tab="trace">Behind the scenes</button>
+      <button data-tab="ions">Ions (Axon)</button>
+      <button data-tab="audit">Audit log</button>
+    </div>
+    <div class="tabpane on" id="tab-trace"><div class="trace" id="trace"></div><div class="note">Green = deterministic gate in code. Every tool shows its permission string, read/write kind and the HPlus route it would call.</div></div>
+    <div class="tabpane" id="tab-ions">
+      <div class="ions-head"><span class="on">Action items</span><span>My transcript</span><span>Documents</span></div>
+      <div class="feed" id="ions"></div>
+      <div class="note">What a staff member (and their supervisor, for action items) would see under Ions in Axon and the Assistant tab in Vigil.</div>
+    </div>
+    <div class="tabpane" id="tab-audit"><div class="feed audit" id="audit"></div><div class="note">Rows as they would land in ClickHouse action logs, tagged <code>createdFrom=WHATSAPP</code> with the WhatsApp message id.</div></div>
+  </aside>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ───────────── mock world ───────────── */
+const HOSPITALS = {
+  hos_SUN101: { id:'hos_SUN101', name:'Sunrise Multispeciality', city:'Pune' },
+  hos_SUN202: { id:'hos_SUN202', name:'Sunrise Nagar Clinic', city:'Pune' },
+};
+const MODULES = {
+  patient:'Patients', appointment:'OPD appointments', ipd:'IPD', prescription:'Prescriptions', todo:'Tasks',
+  myAttendance:'My attendance', hr:'HR', workforce:'Workforce', newInventory:'Inventory', newFinance:'Finance', bills:'Billing', labsTests:'Lab', Accounts:'Hospital settings', permission:'Roles & access'
+};
+const CATEGORIES = [
+  { id:'clinical', name:'Clinical', modules:['ipd','patient','prescription','labsTests'] },
+  { id:'hr', name:'HR', modules:['hr','workforce','myAttendance'] },
+  { id:'finance', name:'Finance', modules:['newFinance','bills'] },
+  { id:'vendor', name:'Vendor contracts', modules:['newFinance','bills'] },
+  { id:'quality', name:'Quality / NABH', modules:['Accounts','ipd','patient','hr','newInventory'] },
+];
+const PERSONAS = [
+  { id:'nurse', name:'Priya Nair', role:'Nurse · Ward B', empId:'66f1a2c4e9b1d2a3f4c5d6e7', phone:'+91 98200 11223', hospitals:['hos_SUN101','hos_SUN202'], linked:true,
+    modules:['patient','appointment','ipd','todo','myAttendance','newInventory'], views:['appointment','newInventory'], desc:'Two-hospital staff. Sees the hospital picker.' },
+  { id:'doctor', name:'Dr. Arjun Sharma', role:'Consultant · Medicine', empId:'66f1a2c4e9b1d2a3f4c5d6e8', phone:'+91 98200 33445', hospitals:['hos_SUN101'], linked:true,
+    modules:['patient','appointment','ipd','prescription','labsTests','todo','myAttendance'], views:[], desc:'Full clinical access, no HR or finance.' },
+  { id:'hr', name:'Anjali Mehta', role:'HR Manager', empId:'66f1a2c4e9b1d2a3f4c5d6e9', phone:'+91 98200 55667', hospitals:['hos_SUN101'], linked:true,
+    modules:['hr','workforce','todo','myAttendance'], views:[], desc:'Approves leave, owns HR documents. No patient data.' },
+  { id:'accounts', name:'Rahul Verma', role:'Accountant', empId:'66f1a2c4e9b1d2a3f4c5d6f0', phone:'+91 98200 77889', hospitals:['hos_SUN101'], linked:true,
+    modules:['newFinance','bills','newInventory','todo','myAttendance'], views:[], desc:'Finance and vendor documents. No clinical data.' },
+  { id:'admin', name:'Sunita Rao', role:'Hospital super_admin', empId:'66f1a2c4e9b1d2a3f4c5d6f1', phone:'+91 98200 99001', hospitals:['hos_SUN101'], linked:true,
+    modules:Object.keys(MODULES), views:[], desc:'Wildcard permission. Can audit transcripts.' },
+  { id:'unlinked', name:'Unknown number', role:'Not linked', empId:null, phone:'+91 91234 00000', hospitals:[], linked:false,
+    modules:[], views:[], desc:'Experience the link + OTP flow.' },
+];
+const DOCTORS = [
+  { id:'doc1', name:'Dr. Arjun Sharma', dept:'Medicine', slots:['09:00','09:15','09:30','09:45','10:00','10:15','11:00'] },
+  { id:'doc2', name:'Dr. Meera Iyer', dept:'Paediatrics', slots:['10:00','10:20','10:40','16:00','16:20'] },
+  { id:'doc3', name:'Dr. Sunil Kulkarni', dept:'Orthopaedics', slots:['14:00','14:30','15:00'] },
+];
+const PATIENTS = [
+  { uhid:'SUN-2024-04817', name:'Ramesh Patil', age:62, sex:'M', phone:'98xxxx4410', last:'OPD · Medicine · 28 Aug 2026', dx:'Type 2 diabetes, hypertension', allergies:'Penicillin' },
+  { uhid:'SUN-2025-01102', name:'Ramesh Kumar', age:41, sex:'M', phone:'97xxxx2201', last:'IPD · Bed 12 · admitted 2 Sep 2026', dx:'Cellulitis, left leg', allergies:'None recorded' },
+  { uhid:'SUN-2026-00231', name:'Sunita Patil', age:35, sex:'F', phone:'99xxxx8890', last:'OPD · Paediatrics (child) · 15 Aug 2026', dx:'—', allergies:'None recorded' },
+];
+const BEDS = [
+  { bed:'12', ward:'B', patient:'Ramesh Kumar', uhid:'SUN-2025-01102', day:3, vitals:'BP 128/82 · HR 84 · SpO₂ 97% · Temp 98.9°F (06:00)' },
+  { bed:'14', ward:'B', patient:'Kavita Joshi', uhid:'SUN-2026-00988', day:1, vitals:'BP 110/70 · HR 92 · SpO₂ 98% · Temp 100.4°F (06:00)' },
+  { bed:'15', ward:'B', patient:'—', uhid:null, day:0, vitals:'vacant' },
+];
+const STAFF = [
+  { name:'Ravi Kumar', role:'Nurse · Ward B', id:'emp_ravi' }, { name:'Sneha Pawar', role:'Nurse · Ward A', id:'emp_sneha' },
+  { name:'Imran Shaikh', role:'Pharmacist', id:'emp_imran' }, { name:'Anjali Mehta', role:'HR Manager', id:'emp_anjali' },
+];
+const STOCK = [
+  { item:'Inj. Ceftriaxone 1g', store:'Ward B', qty:14, reorder:20, batch:'CX2409', exp:'Mar 2027' },
+  { item:'Paracetamol 500 mg', store:'Main pharmacy', qty:2400, reorder:1000, batch:'PC2601', exp:'Dec 2027' },
+  { item:'IV set', store:'Ward B', qty:6, reorder:15, batch:'—', exp:'—' },
+];
+const LEAVE_REQUESTS = [
+  { id:'LV-118', who:'Ravi Kumar', type:'Casual', dates:'8–9 Sep', days:2, reason:'Family function' },
+  { id:'LV-121', who:'Sneha Pawar', type:'Sick', dates:'5 Sep', days:1, reason:'Fever' },
+];
+const DOC_LIBRARY = {
+  leave: { name:'Leave_Policy_2026.pdf', pages:6, suggest:'hr', chunks:[
+    { q:['casual','cl ','chutti','leave'], a:'Casual leave (CL) is 12 days per calendar year, credited monthly at 1 day, maximum 3 consecutive days without prior approval; unused CL lapses on 31 December.', page:3 },
+    { q:['sick','sl ','medical'], a:'Sick leave is 10 days per year; more than 2 consecutive days needs a medical certificate submitted to HR within 3 working days.', page:3 },
+    { q:['maternity'], a:'Maternity leave is 26 weeks as per the Maternity Benefit (Amendment) Act, 2017, for the first two children.', page:4 },
+  ]},
+  nabh: { name:'NABH_Chapter_AAC_SOPs.pdf', pages:42, suggest:'quality', chunks:[
+    { q:['transfer','shift'], a:'AAC.7: intra-hospital transfer requires a completed transfer note, vitals recorded within 30 minutes before transfer, and handover to the receiving nurse using the SBAR format.', page:19 },
+    { q:['discharge'], a:'AAC.13: the discharge summary must be given to the patient at discharge and must include diagnosis, treatment, medications with dose and duration, and follow-up instructions.', page:31 },
+  ]},
+  vendor: { name:'Q2_Vendor_Contracts.xlsx', pages:4, suggest:'vendor', chunks:[
+    { q:['ceftriaxone','antibiotic','cipla','rate'], a:'Inj. Ceftriaxone 1g — MedSupply Distributors — ₹38.50 per vial, credit period 45 days, valid till 30 Sep 2026.', page:1 },
+    { q:['credit','payment terms'], a:'Standard credit period for pharmacy vendors is 45 days; consumables 30 days; equipment AMC quarterly in advance.', page:2 },
+  ]},
+};
+
+/* ───────────── state ───────────── */
+let S; const now = () => new Date();
+function reset(persona) {
+  const lang = S ? S.lang : 'auto';
+  S = { persona, linked: persona.linked, hospital: null, lang, pending: null, awaiting: null, otp: null,
+        tasks: [], docs: [], msgs: 0, mid: 4000, ions: [], audit: [], turn: 0, lastLang: 'en', gen: (S ? S.gen : 0) + 1 };
+  if (persona.hospitals.length === 1) S.hospital = HOSPITALS[persona.hospitals[0]];
+  thread.innerHTML = ''; trace.innerHTML = ''; renderIons(); renderAudit(); renderPersona();
+  sys('Today'); sys('🔒 Messages are end-to-end encrypted. This is a business account.');
+  if (!persona.linked) tr(`<span class="t">persona</span> unlinked number · send any message to start the link flow`, 'warn');
+  welcome();
+}
+
+/* ───────────── helpers ───────────── */
+const $ = id => document.getElementById(id);
+const thread = $('thread'), trace = $('trace');
+const tstamp = () => now().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+const wamid = () => 'wamid.HBg' + (S.mid++).toString(36).toUpperCase() + 'Q';
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function sys(t){ const d=document.createElement('div'); d.className='sys'; d.textContent=t; thread.appendChild(d); scroll(); }
+function scroll(){ thread.scrollTop = thread.scrollHeight; }
+function out(html){ const d=document.createElement('div'); d.className='msg out'; d.innerHTML = html + `<span class="time">${tstamp()} ✓✓</span>`; thread.appendChild(d); scroll(); }
+function inMsg(html, opts={}) {
+  return new Promise(res => {
+    const ty=document.createElement('div'); ty.className='typing'; ty.textContent='typing…'; thread.appendChild(ty); scroll();
+    const gen = S.gen;
+    setTimeout(()=>{ ty.remove(); if (gen !== S.gen) { res(null); return; } const d=document.createElement('div'); d.className='msg in'; d.innerHTML = html + `<span class="time">${tstamp()}</span>`;
+      if (opts.buttons) { const b=document.createElement('div'); b.className='btns';
+        opts.buttons.forEach(bt=>{ const el=document.createElement('button'); el.textContent=bt.label; el.onclick=()=>{ [...b.querySelectorAll('button')].forEach(x=>x.disabled=true); out(esc(bt.label)); handleButton(bt.id, bt); }; b.appendChild(el); });
+        d.appendChild(b); }
+      if (opts.list) { const l=document.createElement('div'); l.className='list';
+        opts.list.forEach(it=>{ const el=document.createElement('button'); el.innerHTML = `${esc(it.title)}<small>${esc(it.sub||'')}</small>`; el.onclick=()=>{ [...l.querySelectorAll('button')].forEach(x=>x.disabled=true); out(esc(it.title)); handleButton(it.id, it); }; l.appendChild(el); });
+        d.appendChild(l); }
+      thread.appendChild(d); scroll(); res(d); }, opts.delay ?? 550);
+  });
+}
+function tr(line, cls=''){ const d=document.createElement('div'); if(cls) d.className=cls; d.innerHTML=line; trace.appendChild(d); trace.scrollTop=trace.scrollHeight; }
+function turnHeader(text){ S.turn++; tr(`<span class="turn">#${S.turn} inbound "${esc(text).slice(0,60)}" · ${wamid()}</span>`); }
+function hi(){ return S.lastLang === 'hi'; }
+function L(en, hiText){ return hi() ? hiText : en; }
+function detectLang(text){
+  if (S.lang !== 'auto') return S.lang;
+  if (/[ऀ-ॿ]/.test(text)) return 'hi';
+  const hinglish = /\b(kal|aaj|hai|hain|ka|ke|ki|ko|kitne|kitna|bolo|karo|kar|do|batao|dikhao|chutti|mareez|bed|nahi|haan|kya|mujhe|mera|meri|abhi|lagao|dena)\b/i;
+  return hinglish.test(text) ? 'hi' : 'en';
+}
+function permitted(mod){ return S.persona.modules.includes(mod); }
+function canWrite(mod){ return permitted(mod) && !S.persona.views.includes(mod); }
+function userModules(){ return S.persona.modules; }
+function docVisible(doc){ const cat = CATEGORIES.find(c=>c.id===doc.category); return cat && cat.modules.some(m=>permitted(m)); }
+function pushIons(kind, text, meta){ S.ions.unshift({kind, text, meta, at:tstamp()}); renderIons(); }
+function pushAudit(route, coll, docId, action){ S.audit.unshift({at:tstamp(), user:S.persona.name, route, coll, docId, action, from:'WHATSAPP', mid:wamid()}); renderAudit(); }
+function renderIons(){ const el=$('ions'); el.innerHTML = S.ions.length ? S.ions.map(i=>`<div class="item"><div class="k">${esc(i.kind)}</div>${esc(i.text)}<div class="m">${esc(i.meta||'')} · ${i.at}</div></div>`).join('') : '<div class="empty">No action items yet. Create a task, book an appointment or upload a document.</div>'; }
+function renderAudit(){ const el=$('audit'); el.innerHTML = S.audit.length ? `<table><tr><th>Time</th><th>User</th><th>Route</th><th>Collection · doc</th><th>Origin</th></tr>${S.audit.map(a=>`<tr><td>${a.at}</td><td>${esc(a.user)}</td><td><code>${esc(a.route)}</code></td><td><code>${esc(a.coll)}</code> ${esc(a.docId)}<br><small>${esc(a.action)}</small></td><td><code>${a.from}</code><br><small>${a.mid}</small></td></tr>`).join('')}</table>` : '<div class="empty">No writes yet. Reads are not audited as changes; confirmed writes appear here.</div>'; }
+
+/* ───────────── identity + gates ───────────── */
+function identityGate(text){
+  turnHeader(text);
+  tr(`<span class="t">ledger</span> assistant.inbound_events insert ok (dedup by wamid)`, 'ok');
+  if (!S.linked) { tr(`<span class="t">identity</span> ${esc(S.persona.phone)} → no ACTIVE link`, 'bad'); return false; }
+  tr(`<span class="t">identity</span> ${esc(S.persona.phone)} → ${esc(S.persona.name)} · employeeId ${S.persona.empId.slice(0,8)}… · ${S.persona.hospitals.length} hospital(s)`, 'ok');
+  if (!S.hospital) { tr(`<span class="t">session</span> no active hospital → ask`, 'warn'); return 'pick'; }
+  tr(`<span class="t">session</span> hospital ${S.hospital.id} (${esc(S.hospital.name)}) · lang ${S.lastLang}`);
+  tr(`<span class="t">token</span> POST auth-service /service/assistant-token → aud assistant_service_token · 10 min · cached`, 'ok');
+  tr(`<span class="t">perms</span> GET HPlus /api/auth/me (no lat/long) → modules [${userModules().join(', ')}]`, 'ok');
+  return true;
+}
+function toolGate(mod, routeKey, kind, path){
+  const allowed = kind==='read' ? permitted(mod) : canWrite(mod);
+  tr(`<span class="t">tool</span> ${esc(routeKey)} · ${kind} · ${esc(path)}`);
+  tr(`<span class="t">gate</span> permission ${allowed?'ALLOWED':'DENIED'} (${mod}.* ${allowed?'∈':'∉'} effective set)`, allowed?'ok':'bad');
+  return allowed;
+}
+async function deny(mod){
+  const label = MODULES[mod] || mod;
+  await inMsg(L(`You don't have access to <b>${esc(label)}</b> at ${esc(S.hospital.name)}. Ask your admin to grant it in Axon → Accounts → Manage roles.`,
+                `Aapke paas <b>${esc(label)}</b> ka access nahi hai (${esc(S.hospital.name)}). Admin se Axon → Accounts → Manage roles mein access lene ko kahein.`));
+}
+
+/* ───────────── flows ───────────── */
+async function welcome(){
+  if (!S.linked) return;
+  const p = S.persona;
+  await inMsg(`Namaste ${esc(p.name.split(' ')[0])} 👋 ${S.hospital ? `You're on <b>${esc(S.hospital.name)}</b>. ` : ''}I can help with ${userModules().slice(0,4).map(m=>MODULES[m]).join(', ')}${userModules().length>4?' and more':''}. Type what you need, send a voice note, or attach a document. Say <i>help</i> anytime.`, {delay:200});
+}
+async function askHospital(then){
+  S.awaiting = { kind:'hospital', then };
+  await inMsg(L('You are linked at two hospitals. Which one is this about?', 'Aap do hospitals se linked hain. Kis hospital ke liye?'),
+    { list: S.persona.hospitals.map(h => ({ id:'hosp:'+h, title:HOSPITALS[h].name, sub:HOSPITALS[h].city })) });
+}
+async function startLink(){
+  tr(`<span class="t">link</span> reply: number not linked → instruct to link from Axon/Vigil`);
+  await inMsg(`This number isn't linked to a Medoc account. Open <b>Axon → Settings → WhatsApp Assistant</b> (or Vigil → Profile) and enter this number. You'll get a one-time code here.`,
+    { buttons:[{ id:'simlink', label:'Simulate: link from Axon app' }] });
+}
+async function handleButton(id, bt){
+  if (id === 'simlink') {
+    S.otp = String(Math.floor(100000 + Math.random()*900000));
+    tr(`<span class="t">app</span> Axon settings → POST /api/link/start {phone} (Axon bearer) → link PENDING · consent recorded`, 'ok');
+    tr(`<span class="t">template</span> assistant_link_otp (AUTHENTICATION) → OTP ${S.otp} · expires 5 min · 5 attempts`, 'ok');
+    S.awaiting = { kind:'otp' };
+    await inMsg(`<b>${S.otp}</b> is your Medoc verification code. It expires in 5 minutes. Don't share it.<br><small>Now type the code back here (in the real flow you type it into the Axon screen).</small>`);
+    return;
+  }
+  if (id.startsWith('hosp:')) {
+    S.hospital = HOSPITALS[id.slice(5)]; $('waSub').textContent = 'Business account · ' + S.hospital.name;
+    tr(`<span class="t">session</span> activeHospitalId=${S.hospital.id} set (12 h idle expiry)`, 'ok');
+    const then = S.awaiting && S.awaiting.then; S.awaiting = null;
+    if (then) await route(then, true); else await inMsg(L(`Got it, <b>${esc(S.hospital.name)}</b>. What do you need?`, `Theek hai, <b>${esc(S.hospital.name)}</b>. Kya chahiye?`));
+    return;
+  }
+  if (id === 'confirm' || id === 'cancel') { await resolvePending(id === 'confirm'); return; }
+  if (id.startsWith('pat:')) { await patientCard(PATIENTS.find(p=>p.uhid===id.slice(4))); return; }
+  if (id.startsWith('slot:')) { const [ , docId, time ] = id.split(':'); await proposeBooking(docId, time); return; }
+  if (id.startsWith('assignee:')) { const st = STAFF.find(s=>s.id===id.slice(9)); await proposeTask(S.awaiting.title, st, S.awaiting.due); return; }
+  if (id.startsWith('cat:')) { await fileDocument(id.slice(4)); return; }
+  if (id.startsWith('leaveapprove:')) { const r = LEAVE_REQUESTS.find(x=>x.id===id.slice(13)); await proposeLeaveApproval(r); return; }
+  if (id === 'sendfull') { await inMsg(`Full list sent as a PDF 📎<div class="doc"><div class="ic">PDF</div><div>Dr_Sharma_5_Sep_OPD.pdf<br><small>14 appointments · 1 page</small></div></div>`); return; }
+  if (id === 'senddoc') { const d=S.docs[S.docs.length-1]; tr(`<span class="t">upload</span> POST upload-service /internal/read-url (15 min SAS) → document message`, 'ok'); await inMsg(`<div class="doc"><div class="ic">PDF</div><div>${esc(d.name)}<br><small>${d.pages} pages</small></div></div>`); return; }
+  if (id === 'savevitals') { await proposeVitalsFromPhoto(); return; }
+}
+
+async function route(text, resumed=false){
+  S.lastLang = detectLang(text);
+  const t = text.toLowerCase();
+  if (!resumed) {
+    // awaiting states first
+    if (S.awaiting && S.awaiting.kind === 'otp') { turnHeader(text); if (text.replace(/\D/g,'') === S.otp) { S.linked = true; S.awaiting=null; tr(`<span class="t">link</span> POST /api/link/verify → identity {hospitalId, employeeId} taken from the Axon token, not the body → ACTIVE`, 'ok'); tr(`<span class="t">template</span> assistant_linked (UTILITY) sent`, 'ok'); S.persona = { ...PERSONAS[0], phone:S.persona.phone, desc:'Now linked as Priya Nair (nurse) for the demo.' }; renderPersona(); await inMsg(`✅ Linked. Welcome, Priya. You're a Nurse at Sunrise Multispeciality and Sunrise Nagar Clinic. Text me whenever you need something.`); return; } tr(`<span class="t">link</span> OTP mismatch (attempt counted)`, 'bad'); await inMsg('That code doesn\'t match. Check the code above and try again.'); return; }
+    const g = identityGate(text);
+    if (g === false) { await startLink(); return; }
+    if (g === 'pick') { await askHospital(text); return; }
+    if (S.pending) { if (/^(yes|haan|ha|confirm|ok)$/i.test(t)) { tr(`<span class="t">confirm</span> free-text "yes" is NOT accepted as confirmation (buttons only)`, 'warn'); await inMsg(L('Please tap <b>Confirm</b> on the preview above so I can be sure.', 'Upar wale preview par <b>Confirm</b> dabayein, taaki main sure ho sakun.')); return; } }
+  }
+  // router
+  const mods = [];
+  const add = m => { if (!mods.includes(m)) mods.push(m); };
+  if (/^help$|\bhelp\b|madad|kya kar sakte/.test(t)) return help();
+  if (/switch hospital|hospital badlo|change hospital/.test(t)) { S.hospital=null; return askHospital('');}
+  if (/leave|chutti/.test(t)) add(/approve|pending|request/.test(t) ? 'hr' : 'myAttendance');
+  if (/stock|inventory|indent|reorder|ceftriaxone|paracetamol|iv set/.test(t)) add('newInventory');
+  if (/task|assign|remind|bolo|karne ko|yaad dila|my tasks|mere task/.test(t)) add('todo');
+  if (/bed|ward|vitals|admit|ipd|bp |discharge/.test(t)) add('ipd');
+  if (/appointment|slot|book|opd|token/.test(t)) add('appointment');
+  if (/patient|mareez|uhid|find|search|dhundo|ramesh|patil|kumar/.test(t)) add('patient');
+  if (/bill|invoice|revenue|collection|outstanding|payment/.test(t)) add('newFinance');
+  const wantsRag = /policy|sop|nabh|contract|vendor rate|document|what does|kitni milti|as per|according to|rule/.test(t);
+  if (wantsRag) mods.unshift('rag');
+  if (mods.length === 0) { if (S.docs.length) add('rag'); }
+  tr(`<span class="t">router</span> Gemini Flash → modules [${mods.join(', ')||'none'}] · lang ${S.lastLang} · needsRag ${mods.includes('rag')}`);
+  const m = mods[0];
+  if (!m) return inMsg(L(`I didn't catch that. Try <i>help</i> to see what I can do.`, `Samajh nahi aaya. <i>help</i> likhein to main batata hoon main kya kar sakta hoon.`));
+  if (m === 'rag') return ragQuery(text);
+  if (m === 'patient') return patientSearch(text);
+  if (m === 'appointment') return /book|slot|lagao|de do|dena/.test(t) ? bookAppointment(text) : listAppointments(text);
+  if (m === 'ipd') return /record|note|likho|update|bp \d|spo2|temp/.test(t) ? recordVitals(text) : ipdBoard(text);
+  if (m === 'todo') return /my tasks|mere task|pending task/.test(t) ? listTasks() : createTask(text);
+  if (m === 'myAttendance') return applyLeave(text);
+  if (m === 'hr') return approveLeave();
+  if (m === 'newInventory') return /indent|order|mangao|reorder/.test(t) ? raiseIndent(text) : stockCheck(text);
+  if (m === 'newFinance') return finance(text);
+}
+
+async function help(){
+  const lines = userModules().map(m => '• ' + MODULES[m]).join('<br>');
+  await inMsg(`Here's what you can do at <b>${esc(S.hospital.name)}</b>, based on your role:<br>${lines}<br>• Documents: attach a file to save it; ask questions about saved documents<br>• Say <i>switch hospital</i> to change hospital.`);
+}
+
+/* patients */
+async function patientSearch(text){
+  if (!toolGate('patient','patient.getPatientsBySearch.view','read','GET /api/patient/getPatientsBySearch')) return deny('patient');
+  const q = (text.match(/ramesh|patil|kumar|sunita/i)||['ramesh'])[0].toLowerCase();
+  const hits = PATIENTS.filter(p => p.name.toLowerCase().includes(q));
+  tr(`<span class="t">http</span> 200 · ${hits.length} result(s) · projection [uhid,name,age,gender,lastVisit]`, 'ok');
+  if (hits.length === 1) return patientCard(hits[0]);
+  await inMsg(L(`I found ${hits.length} patients matching "${esc(q)}". Which one?`, `"${esc(q)}" ke ${hits.length} mareez mile. Kaun sa?`),
+    { list: hits.map(p => ({ id:'pat:'+p.uhid, title:`${p.name} · ${p.age}${p.sex}`, sub:`${p.uhid} · ${p.last}` })) });
+}
+async function patientCard(p){
+  tr(`<span class="t">tool</span> patient.getPatientById.view · read · GET /api/patient/getPatient?uhid=…`); tr(`<span class="t">http</span> 200 · PHI returned to linked staff (owner policy)`, 'ok');
+  await inMsg(`<div class="card"><b>${esc(p.name)}, ${p.age}${p.sex}</b><div class="kv"><span>UHID</span><span>${p.uhid}</span><span>Phone</span><span>${p.phone}</span><span>Last visit</span><span>${esc(p.last)}</span><span>Diagnosis</span><span>${esc(p.dx)}</span><span>Allergies</span><span>${esc(p.allergies)}</span></div></div>${L('Want to book an OPD slot, see vitals, or view the last prescription?', 'OPD slot book karun, vitals dikhaun, ya last prescription?')}`);
+}
+
+/* appointments */
+async function listAppointments(text){
+  if (!toolGate('appointment','appointment.getAppointmentsByDoctor.view','read','GET /api/appointment/getByDoctor')) return deny('appointment');
+  const doc = DOCTORS.find(d => text.toLowerCase().includes(d.name.split(' ').pop().toLowerCase())) || DOCTORS[0];
+  const day = /kal|tomorrow/i.test(text) ? L('tomorrow (5 Sep)','kal (5 Sep)') : L('today (4 Sep)','aaj (4 Sep)');
+  tr(`<span class="t">http</span> 200 · 14 appointments · projection [token,time,patientName,uhid]`, 'ok');
+  await inMsg(`${esc(doc.name)} ${day}: <b>14 appointments</b>, 09:00–13:00.<br>Token 1 · 09:00 · Ramesh Patil<br>Token 2 · 09:15 · Kavita Joshi<br>Token 3 · 09:30 · Sunita Patil<br>…`, { buttons:[{id:'sendfull', label: L('Send full list as PDF','Poori list PDF mein bhejo')}] });
+}
+async function bookAppointment(text){
+  if (!toolGate('appointment','appointment.addAppointment.create','write','POST /api/appointment/add')) return deny('appointment');
+  const doc = DOCTORS.find(d => text.toLowerCase().includes(d.name.split(' ').pop().toLowerCase())) || DOCTORS[0];
+  tr(`<span class="t">tool</span> appointment.getSlots.view · read · GET /api/appointment/slots?doctorId=${doc.id}&date=2026-09-05`); tr(`<span class="t">http</span> 200 · ${doc.slots.length} free slots`, 'ok');
+  S.awaiting = { kind:'slot', doc };
+  await inMsg(L(`Free slots with ${esc(doc.name)} tomorrow (5 Sep). Pick one:`, `${esc(doc.name)} ke kal (5 Sep) ke khali slots. Ek chunein:`),
+    { list: doc.slots.slice(0,5).map(s => ({ id:`slot:${doc.id}:${s}`, title:s, sub:doc.dept })) });
+}
+async function proposeBooking(docId, time){
+  const doc = DOCTORS.find(d=>d.id===docId); const p = PATIENTS[0];
+  createPending({ title:'Book OPD appointment', route:'appointment.addAppointment.create', path:'POST /api/appointment/add', coll:'Appointments',
+    lines:[['Patient', `${p.name} · ${p.uhid}`],['Doctor', `${doc.name} (${doc.dept})`],['Date · time', `5 Sep 2026 · ${time}`],['Type','OPD · walk-in fee ₹500'],['WhatsApp reminder','to patient, 1 hour before (template)']],
+    onExecute: () => { pushIons('Appointment booked', `${p.name} with ${doc.name}, 5 Sep ${time}`, 'appointment.addAppointment.create'); return L(`✅ Booked. <b>Token 8</b>, ${doc.name}, 5 Sep at ${time}. The patient will get a WhatsApp reminder an hour before.`, `✅ Book ho gaya. <b>Token 8</b>, ${doc.name}, 5 Sep ${time}. Mareez ko ek ghanta pehle WhatsApp reminder jayega.`); } });
+}
+
+/* IPD */
+async function ipdBoard(text){
+  if (!toolGate('ipd','ipd.getAdmittedPatients.view','read','GET /api/ipd/admitted?ward=B')) return deny('ipd');
+  tr(`<span class="t">http</span> 200 · 3 beds`, 'ok');
+  const rows = BEDS.map(b => `<b>Bed ${b.bed}</b> · ${b.patient}${b.uhid?` · day ${b.day}`:''}<br><small>${b.vitals}</small>`).join('<br>');
+  await inMsg(`${L('Ward B right now:','Ward B abhi:')}<br>${rows}<br>${L('Say <i>record vitals bed 12 BP 130/80 HR 88</i> to add a reading.','<i>bed 12 ka vitals BP 130/80 HR 88</i> likh kar reading add karein.')}`);
+}
+async function recordVitals(text){
+  if (!toolGate('ipd','ipd.vitals.create','write','POST /api/ipd/vitals/add')) return deny('ipd');
+  const bed = (text.match(/bed\s*(\d+)/i)||[,'12'])[1]; const b = BEDS.find(x=>x.bed===bed) || BEDS[0];
+  const bp = (text.match(/bp\s*(\d{2,3}\/\d{2,3})/i)||[,'130/80'])[1]; const hr = (text.match(/hr\s*(\d{2,3})/i)||[,'88'])[1]; const spo2 = (text.match(/spo2\s*(\d{2,3})/i)||[,'97'])[1]; const temp=(text.match(/temp\s*([\d.]+)/i)||[,'98.6'])[1];
+  createPending({ title:'Record vitals', route:'ipd.vitals.create', path:'POST /api/ipd/vitals/add', coll:'IPD_Vitals',
+    lines:[['Patient', `${b.patient} · Bed ${b.bed}, Ward ${b.ward}`],['BP', bp],['Heart rate', hr + ' /min'],['SpO₂', spo2 + ' %'],['Temp', temp + ' °F'],['Recorded by', `${S.persona.name} · ${tstamp()}`]],
+    onExecute: () => { pushIons('Vitals recorded', `Bed ${b.bed} · ${b.patient} · BP ${bp}, HR ${hr}`, 'ipd.vitals.create'); return L(`✅ Vitals saved for Bed ${b.bed}. ${Number(bp.split('/')[0])>=140?'⚠️ Systolic ≥140 — flagged for the duty doctor.':''}`, `✅ Bed ${b.bed} ke vitals save ho gaye. ${Number(bp.split('/')[0])>=140?'⚠️ Systolic ≥140 — duty doctor ko flag kiya.':''}`); } });
+}
+
+/* tasks */
+async function createTask(text){
+  if (!toolGate('todo','todo.add.create','write','POST /api/todo/add')) return deny('todo');
+  const who = STAFF.find(s => text.toLowerCase().includes(s.name.split(' ')[0].toLowerCase()));
+  let title = text.replace(/^.*?\bko bolo\b\s*/i,'').replace(/^.*?\b(?:assign|ask|tell|remind)\s+\w+\s+to\s*/i,'');
+  title = title.replace(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm|baje)\b/ig,'').replace(/\b(karne ko|karne ke liye|kar do|karo|ko)\s*$/i,'').replace(/\s+(at|by)\s*$/i,'').replace(/\s{2,}/g,' ').trim() || 'Follow up';
+  const due = (text.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm|baje))/i)||[,'16:00'])[1];
+  if (!who) { S.awaiting = { kind:'assignee', title, due }; tr(`<span class="t">tool</span> hr.getAllEmployee.view · read · GET /api/hr/employees?search=… → 4`);
+    return inMsg(L('Who should I assign this to?','Kisko assign karun?'), { list: STAFF.map(s=>({ id:'assignee:'+s.id, title:s.name, sub:s.role })) }); }
+  return proposeTask(title, who, due);
+}
+async function proposeTask(title, who, due){
+  createPending({ title:'New task', route:'todo.add.create', path:'POST /api/todo/add', coll:'TaskList',
+    lines:[['Assign to', `${who.name} (${who.role})`],['Title', title.charAt(0).toUpperCase()+title.slice(1)],['Due', `today ${due}`],['Priority','Medium'],['Reminder', `WhatsApp to ${who.name.split(' ')[0]} 15 min before (template)`],['Escalate to', `${S.persona.name} if not done by due + 30 min`]],
+    onExecute: () => { const id='TSK-'+(140+S.tasks.length); S.tasks.push({id,title,who:who.name,due,status:'Pending'}); pushIons('Task created', `${id} · ${title} → ${who.name}, due ${due}`, 'todo.add.create · reminder scheduled'); tr(`<span class="t">scheduler</span> AssistantReminders: remindAt=${due}−15m · template assistant_task_reminder → ${who.name}`, 'ok'); return L(`✅ Task <b>${id}</b> assigned to ${who.name}, due ${due}. ${who.name.split(' ')[0]} will get a WhatsApp reminder; I'll escalate to you if it's not done.`, `✅ Task <b>${id}</b> ${who.name} ko assign ho gaya, ${due} tak. ${who.name.split(' ')[0]} ko WhatsApp reminder jayega; nahi hua to main aapko batata hoon.`); } });
+}
+async function listTasks(){
+  if (!toolGate('todo','todo.getTasksByAssigneeId.view','read','GET /api/todo/getTasksByAssigneeId')) return deny('todo');
+  const mine = S.tasks.length ? S.tasks.map(t=>`• <b>${t.id}</b> ${t.title} → ${t.who} · ${t.due} · ${t.status}`).join('<br>') : L('No open tasks created by you today.','Aaj aapke banaye koi open task nahi.');
+  await inMsg(`${L('Your tasks:','Aapke tasks:')}<br>${mine}`);
+}
+
+/* HR */
+async function applyLeave(text){
+  if (!toolGate('myAttendance','myAttendance.applyLeave.create','write','POST /api/myAttendance/leave/apply')) return deny('myAttendance');
+  tr(`<span class="t">tool</span> myAttendance.leaveBalance.view · read → CL 7 · SL 9 · EL 12`, 'ok');
+  const dates = (text.match(/(\d{1,2}(?:\s*[–-]\s*\d{1,2})?\s*(?:sep|sept|oct|nov))/i)||[,'8–9 Sep'])[1];
+  createPending({ title:'Apply for leave', route:'myAttendance.applyLeave.create', path:'POST /api/myAttendance/leave/apply', coll:'LeaveRequests',
+    lines:[['Type','Casual leave'],['Dates', dates + ' 2026 (2 days)'],['Balance after','CL 5 of 12'],['Approver','Anjali Mehta (HR)'],['Reason', (text.match(/for\s+(.+)$|ke liye\s+(.+)$/i)||[,'—'])[1]||'—']],
+    onExecute: () => { pushIons('Leave requested', `${S.persona.name} · Casual · ${dates}`, 'myAttendance.applyLeave.create · approver notified'); return L(`✅ Leave request <b>LV-124</b> sent to Anjali Mehta. I'll tell you when it's approved.`, `✅ Leave request <b>LV-124</b> Anjali Mehta ko bhej diya. Approve hote hi bataunga.`); } });
+}
+async function approveLeave(){
+  if (!toolGate('hr','hr.leave.approve.update','write','PUT /api/hr/leave/approve')) return deny('hr');
+  tr(`<span class="t">tool</span> hr.leave.pending.view · read → ${LEAVE_REQUESTS.length} pending`, 'ok');
+  await inMsg(`${LEAVE_REQUESTS.length} leave requests are waiting for you:`, { list: LEAVE_REQUESTS.map(r=>({ id:'leaveapprove:'+r.id, title:`${r.who} · ${r.type} · ${r.dates}`, sub:`${r.id} · ${r.days} day(s) · ${r.reason}` })) });
+}
+async function proposeLeaveApproval(r){
+  createPending({ title:'Approve leave', route:'hr.leave.approve.update', path:'PUT /api/hr/leave/approve', coll:'LeaveRequests', docId:r.id,
+    lines:[['Request', r.id],['Employee', r.who],['Type · dates', `${r.type} · ${r.dates} 2026 (${r.days} day)`],['Ward cover', 'Sneha Pawar on roster'],['Decision','Approve']],
+    onExecute: () => { pushIons('Leave approved', `${r.id} · ${r.who} · ${r.dates}`, 'hr.leave.approve.update · employee notified'); return `✅ ${r.id} approved. ${r.who.split(' ')[0]} has been told on WhatsApp and the duty roster is updated.`; } });
+}
+
+/* inventory */
+async function stockCheck(text){
+  if (!toolGate('newInventory','newInventory.stock.view','read','GET /api/newInventory/stock?search=…')) return deny('newInventory');
+  const hit = STOCK.find(s => s.item.toLowerCase().split(/\s+/).some(w => w.length > 3 && text.toLowerCase().includes(w))) || STOCK[0];
+  tr(`<span class="t">http</span> 200 · 1 item · 2 batches`, 'ok');
+  const low = hit.qty < hit.reorder;
+  await inMsg(`<div class="card"><b>${esc(hit.item)}</b><div class="kv"><span>Store</span><span>${hit.store}</span><span>On hand</span><span>${hit.qty} ${low?'⚠️ below reorder level '+hit.reorder:''}</span><span>Batch · expiry</span><span>${hit.batch} · ${hit.exp}</span></div></div>${low ? L('Want me to raise an indent to the main pharmacy?','Main pharmacy ko indent bhej dun?') : L('Stock is healthy.','Stock theek hai.')}`);
+}
+async function raiseIndent(text){
+  if (!toolGate('newInventory','newInventory.indent.create','write','POST /api/newInventory/indent')) return deny('newInventory');
+  const hit = STOCK.find(s => s.item.toLowerCase().split(/\s+/).some(w => w.length > 3 && text.toLowerCase().includes(w))) || STOCK[0];
+  createPending({ title:'Raise indent', route:'newInventory.indent.create', path:'POST /api/newInventory/indent', coll:'Indents',
+    lines:[['Item', hit.item],['From → to', `Main pharmacy → ${hit.store}`],['Quantity', `${Math.max(hit.reorder*2 - hit.qty, 10)} (to reach 2× reorder level)`],['Priority','Normal'],['Requested by', S.persona.name]],
+    onExecute: () => { pushIons('Indent raised', `${hit.item} · ${hit.store}`, 'newInventory.indent.create · pharmacist notified'); return L(`✅ Indent <b>IND-0931</b> raised. Imran (pharmacy) has been notified.`, `✅ Indent <b>IND-0931</b> ban gaya. Imran (pharmacy) ko bata diya.`); } });
+}
+
+/* finance */
+async function finance(text){
+  if (!toolGate('newFinance','newFinance.summary.view','read','GET /api/newFinance/summary?date=today')) return deny('newFinance');
+  tr(`<span class="t">http</span> 200`, 'ok');
+  await inMsg(`<div class="card"><b>Today's collections (4 Sep)</b><div class="kv"><span>OPD</span><span>₹48,500 (97 bills)</span><span>IPD</span><span>₹2,31,200 (6 discharges)</span><span>Pharmacy</span><span>₹71,340</span><span>Outstanding</span><span>₹4,12,000 (insurance, 11 claims)</span></div></div>Want the outstanding claims list?`);
+}
+
+/* documents + RAG */
+async function attach(kind){
+  const text = 'attachment:' + kind;
+  if (kind === 'register') { out(`<div class="doc"><div class="ic">JPG</div><div>Vitals register · Ward B<br><small>photo · 2.1 MB</small></div></div>`); const g = identityGate('📷 photo of vitals register'); if (g === false) return startLink(); if (g === 'pick') return askHospital(''); return ocrRegister(); }
+  const doc = DOC_LIBRARY[kind] || { name: kind==='scan'?'Discharge_summary_scan.jpg':'file', pages:1, suggest:'clinical', chunks:[] };
+  out(`<div class="doc"><div class="ic">${doc.name.endsWith('.xlsx')?'XLS':doc.name.endsWith('.jpg')?'JPG':'PDF'}</div><div>${esc(doc.name)}<br><small>${doc.pages} page(s)</small></div></div>`);
+  const g = identityGate(text); if (g === false) return startLink(); if (g === 'pick') return askHospital(text);
+  tr(`<span class="t">media</span> GET graph.facebook.com/media → download · sha256 ok · 1.2 MB`, 'ok');
+  tr(`<span class="t">upload</span> POST upload-service /internal/signed-url {scope: ASSISTANT_DOCS, hospitalId from session} → PUT → verify`, 'ok');
+  tr(`<span class="t">extract</span> ${doc.name.endsWith('.jpg')?'no text layer → Gemini vision page transcription':doc.name.endsWith('.xlsx')?'SheetJS → per-sheet markdown':'pdf-parse text layer ok'} · ${doc.pages} page(s) → chunks`, 'ok');
+  tr(`<span class="t">classify</span> Gemini Flash → top: ${doc.suggest} (0.91) · status PENDING_CATEGORY (not searchable yet)`, 'warn');
+  S.awaiting = { kind:'category', doc: { ...doc, key:kind } };
+  const cat = CATEGORIES.find(c=>c.id===doc.suggest);
+  await inMsg(L(`Got <b>${esc(doc.name)}</b>. I'd file it under <b>${cat.name}</b> (visible to ${cat.modules.map(m=>MODULES[m]).join(', ')}). Correct?`, `<b>${esc(doc.name)}</b> mil gaya. Ise <b>${cat.name}</b> mein rakhun (${cat.modules.map(m=>MODULES[m]).join(', ')} ko dikhega). Theek hai?`),
+    { list: [ {id:'cat:'+cat.id, title:`Yes, ${cat.name}`, sub:'suggested'}, ...CATEGORIES.filter(c=>c.id!==cat.id).map(c=>({id:'cat:'+c.id, title:c.name, sub:`visible to ${c.modules.map(m=>MODULES[m]).join(', ')}`})) ] });
+}
+async function fileDocument(catId){
+  const doc = S.awaiting.doc; S.awaiting = null; const cat = CATEGORIES.find(c=>c.id===catId);
+  const mayFile = cat.modules.some(m=>permitted(m));
+  tr(`<span class="t">gate</span> uploader holds a module in "${cat.name}"? ${mayFile?'yes':'no'}`, mayFile?'ok':'bad');
+  if (!mayFile) return inMsg(`You can't file documents under <b>${cat.name}</b> because you don't hold any of its modules. Pick another category or ask your admin.`);
+  doc.category = catId; S.docs.push(doc);
+  tr(`<span class="t">embed</span> gemini-embedding-001 (768-d) · ${doc.pages*3} chunks → hos_X_db.AssistantChunks {permissionModules:[${cat.modules.join(',')}], status:ACTIVE}`, 'ok');
+  pushAudit('assistant.documents.create', 'AssistantDocuments', 'doc_'+doc.key, 'insert · category '+cat.name); pushIons('Document filed', `${doc.name} → ${cat.name}`, 'visible to '+cat.modules.map(m=>MODULES[m]).join(', '));
+  await inMsg(L(`✅ Filed under <b>${cat.name}</b>. Staff with ${cat.modules.map(m=>MODULES[m]).join(', ')} access can now ask me about it. Try: <i>${doc.chunks[0]? 'how much '+doc.chunks[0].q[0].trim()+'…' : 'what does it say about…'}</i>`, `✅ <b>${cat.name}</b> mein file ho gaya. ${cat.modules.map(m=>MODULES[m]).join(', ')} access wale staff ab mujhse iske baare mein pooch sakte hain.`));
+}
+async function ragQuery(text){
+  const mods = userModules();
+  tr(`<span class="t">tool</span> rag.search · read · $vectorSearch on hos_${S.hospital.id.slice(4)}_db.AssistantChunks · filter {status:ACTIVE, permissionModules:{$in:[${mods.join(',')}]}}`);
+  const visible = S.docs.filter(docVisible); const hidden = S.docs.filter(d=>!docVisible(d));
+  tr(`<span class="t">index</span> ${S.docs.length} document(s) in hospital · ${visible.length} pass the permission filter · ${hidden.length} filtered out in-query`, hidden.length?'warn':'ok');
+  const t = text.toLowerCase();
+  let best = null;
+  for (const d of visible) for (const c of d.chunks) if (c.q.some(k => t.includes(k.trim()))) { best = { d, c }; break; }
+  if (!best && visible.length) { const d = visible[0]; best = { d, c: d.chunks[0] }; }
+  if (!best) {
+    if (hidden.length) { tr(`<span class="t">answer</span> no permitted chunks → deny (documents exist but are outside the user's modules)`, 'bad'); return inMsg(L(`There's nothing in the documents you can access about that. (There are documents on this topic, but they're filed under a category your role can't see.)`, `Aapke access wale documents mein iske baare mein kuch nahi hai. (Is topic par documents hain, par unki category aapke role ko nahi dikhti.)`)); }
+    return inMsg(L(`No documents have been saved for ${esc(S.hospital.name)} yet. Attach a policy, SOP or contract and I'll remember it.`, `${esc(S.hospital.name)} ke liye abhi koi document save nahi hai. Policy, SOP ya contract bhejein, main yaad rakhunga.`));
+  }
+  tr(`<span class="t">answer</span> top chunk ${best.d.name} p.${best.c.page} (score 0.87) → Gemini Pro with <document> tags as data · cite [1]`, 'ok');
+  await inMsg(`${esc(best.c.a)} <b>[1]</b><div class="cite">[1] ${esc(best.d.name)}, page ${best.c.page}</div>`, { buttons:[{id:'senddoc', label: L('Send me the document','Document bhejo')}] });
+}
+async function ocrRegister(){
+  if (!toolGate('ipd','ipd.vitals.create','write','POST /api/ipd/vitals/add')) return deny('ipd');
+  tr(`<span class="t">ocr</span> Gemini Flash vision (sharp 1600px, JSON mode, temp 0.1) → 3 rows extracted · confidence 0.86`, 'ok');
+  await inMsg(`I read 3 rows from the Ward B register photo:<br><b>Bed 12</b> 14:00 · BP 132/84 · HR 86 · SpO₂ 97 · 98.8°F<br><b>Bed 14</b> 14:00 · BP 108/68 · HR 96 · SpO₂ 97 · 101.2°F ⚠️<br><b>Bed 15</b> — vacant<br>Save these to the patients' vitals?`, { buttons:[{id:'savevitals', label:'Review & save'}] });
+}
+async function proposeVitalsFromPhoto(){
+  createPending({ title:'Save 2 vitals readings from photo', route:'ipd.vitals.create', path:'POST /api/ipd/vitals/add (×2)', coll:'IPD_Vitals',
+    lines:[['Bed 12 · Ramesh Kumar','BP 132/84 · HR 86 · SpO₂ 97 · 98.8°F · 14:00'],['Bed 14 · Kavita Joshi','BP 108/68 · HR 96 · SpO₂ 97 · 101.2°F · 14:00'],['Source','Register photo · OCR confidence 0.86'],['Recorded by', S.persona.name]],
+    onExecute: () => { pushIons('Vitals recorded (photo)', 'Bed 12, Bed 14 · from register photo', 'ipd.vitals.create ×2'); return `✅ Saved both readings. Bed 14's temperature (101.2°F) has been flagged to the duty doctor.`; } });
+}
+
+/* voice */
+async function voiceNote(){
+  const samples = [
+    { t:'Kal Dr. Sharma ke kitne appointments hain?', lang:'hi' },
+    { t:'Ravi ko bolo bed 12 ka dressing 4 baje karne ko', lang:'hi' },
+    { t:'How much ceftriaxone is left in ward B?', lang:'en' },
+  ];
+  const s = samples[S.msgs % samples.length]; S.msgs++;
+  out(`<div class="voice">🎤<div class="wave"></div><small>0:06</small></div>`);
+  const g = identityGate('🎤 voice note 0:06'); if (g === false) return startLink(); if (g === 'pick') return askHospital(s.t);
+  tr(`<span class="t">media</span> audio/ogg downloaded · Gemini Flash inlineData → transcript "${esc(s.t)}" · lang ${s.lang}`, 'ok');
+  await inMsg(`🎧 <i>“${esc(s.t)}”</i>`, {delay:900});
+  await route(s.t, true);
+}
+
+/* pending actions */
+function createPending(spec){
+  const id = 'pa_' + Math.random().toString(36).slice(2,8);
+  S.pending = { id, ...spec, createdAt: Date.now() };
+  tr(`<span class="t">pending</span> AssistantPendingActions ${id} · PENDING · expires 10 min · idempotencyKey sha256(tool+args+wamid)`, 'warn');
+  const kv = spec.lines.map(([k,v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join('');
+  inMsg(`<div class="card"><b>${esc(spec.title)}</b><div class="kv">${kv}</div></div>${L('Shall I go ahead?','Kar dun?')}`, { buttons:[{id:'confirm', label:'Confirm'},{id:'cancel', label:'Cancel'}] });
+}
+async function resolvePending(yes){
+  const p = S.pending; if (!p) return inMsg('That action has already been handled.');
+  if (Date.now() - p.createdAt > 10*60*1000) { S.pending=null; tr(`<span class="t">pending</span> ${p.id} EXPIRED`, 'bad'); return inMsg('That preview expired. Ask me again and I\'ll make a fresh one.'); }
+  S.pending = null;
+  if (!yes) { tr(`<span class="t">pending</span> ${p.id} CANCELLED · nothing written`, 'warn'); return inMsg(L('Cancelled. Nothing was changed.','Cancel. Kuch change nahi hua.')); }
+  tr(`<span class="t">pending</span> ${p.id} CONFIRMED (findOneAndUpdate on PENDING guards double taps)`, 'ok');
+  tr(`<span class="t">http</span> ${esc(p.path)} · Authorization: Bearer &lt;assistant token&gt; · x-assistant-message-id: wamid… → 201`, 'ok');
+  tr(`<span class="t">audit</span> ClickHouse action_log {createdFrom: WHATSAPP, meta.sourceMessageId, route: ${esc(p.route)}}`, 'ok');
+  pushAudit(p.route, p.coll, p.docId || ('doc_'+p.id.slice(3)), 'insert · confirmed via button');
+  const reply = p.onExecute();
+  await inMsg(reply);
+}
+
+/* ───────────── UI wiring ───────────── */
+const SCENARIOS = [
+  { g:'Identity' }, { t:'Kal Dr. Sharma ke kitne appointments hain?', k:'hospital picker · Hindi' }, { t:'switch hospital', k:'session' },
+  { g:'Patients & OPD' }, { t:'Find patient Ramesh', k:'read' }, { t:'Book an appointment for Ramesh Patil with Dr. Sharma tomorrow', k:'write' },
+  { g:'IPD' }, { t:'Ward B beds', k:'read' }, { t:'Record vitals bed 12 BP 142/90 HR 88 SpO2 96', k:'write · flag' },
+  { g:'Work management' }, { t:'Ravi ko bolo bed 12 ka dressing 4 baje karne ko', k:'task · Hindi' }, { t:'My tasks', k:'read' },
+  { g:'HR' }, { t:'Apply casual leave 8–9 Sep for a family function', k:'self-service' }, { t:'Show pending leave requests', k:'HR only' },
+  { g:'Inventory & finance' }, { t:'How much ceftriaxone is left in ward B?', k:'read' }, { t:'Raise an indent for ceftriaxone', k:'write' }, { t:"Today's collections", k:'accounts only' },
+  { g:'Documents' }, { t:'How much casual leave do I get as per policy?', k:'RAG · needs a doc' }, { t:'What is the vendor rate for ceftriaxone?', k:'RAG · finance only' },
+];
+function renderPersona(){
+  const p = S.persona; const card = $('personaCard');
+  card.innerHTML = `<b>${esc(p.name)}</b>${esc(p.role)} · ${esc(p.phone)}<br><small>${esc(p.desc)}</small><div class="mods">${Object.keys(MODULES).map(m=>`<span class="chip ${p.modules.includes(m)?'on':''}">${m}${p.views.includes(m)?' (view)':''}</span>`).join('')}</div>`;
+  $('waSub').textContent = 'Business account · ' + (S.hospital ? S.hospital.name : 'Sunrise Hospitals');
+}
+function init(){
+  const sel = $('persona'); PERSONAS.forEach(p => { const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} — ${p.role}`; sel.appendChild(o); });
+  sel.onchange = () => { reset(PERSONAS.find(x=>x.id===sel.value)); };
+  $('lang').onchange = e => { S.lang = e.target.value; };
+  const sc = $('scenarios'); SCENARIOS.forEach(s => { if (s.g) { const g=document.createElement('div'); g.className='eyebrow grp'; g.textContent=s.g; sc.appendChild(g); return; } const b=document.createElement('button'); b.innerHTML=`<span>${esc(s.t)}</span><small>${esc(s.k)}</small>`; b.onclick=()=>send(s.t); sc.appendChild(b); });
+  $('btnSend').onclick = () => send($('input').value); $('input').addEventListener('keydown', e => { if (e.key==='Enter') send($('input').value); });
+  $('btnMic').onclick = voiceNote;
+  $('btnAttach').onclick = e => { e.stopPropagation(); $('attachMenu').classList.toggle('open'); };
+  document.addEventListener('click', () => $('attachMenu').classList.remove('open'));
+  [...$('attachMenu').querySelectorAll('button')].forEach(b => b.onclick = () => { $('attachMenu').classList.remove('open'); attach(b.dataset.att); });
+  [...document.querySelectorAll('.tabs button')].forEach(b => b.onclick = () => { document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on')); document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('on')); b.classList.add('on'); $('tab-'+b.dataset.tab).classList.add('on'); });
+  $('btnReset').onclick = () => { reset(PERSONAS.find(x=>x.id===sel.value) || PERSONAS[0]); };
+  reset(PERSONAS[0]);
+}
+let busy = false;
+async function send(text){
+  text = (text||'').trim(); if (!text || busy) return; $('input').value=''; busy = true;
+  out(esc(text));
+  try { await route(text); } catch (e) { tr(`<span class="bad">prototype error: ${esc(e.message)}</span>`); } finally { busy = false; }
+}
+init();
+})();
+</script>
