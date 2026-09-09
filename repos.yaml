@@ -87,9 +87,9 @@ repos:
       - "JWT fallback secrets in verifyTokens.ts and permissionMiddleware.ts — tokens are forgeable if the env var is unset."
       - "Cloudinary credentials in source."
     notes:
-      - "`npm run dev` runs `npm run initialize` first (seeds/derives state). Do not skip it."
+      - "`npm run dev` is just `nodemon` — it does NOT run `npm run initialize`. Run the initializer yourself when you need seeded/derived state."
       - "Path aliases are BARE (`utils/x`), not `@/` — check tsconfig.json before importing."
-      - "Has ts-jest but never wires it; the single test file cannot execute. Wire a config before claiming a test passes."
+      - "jest IS wired now (jest.config.js, ts-jest with a CommonJS override because the project builds as NodeNext). `npx jest` runs 3 suites for real — the old \"declares jest but ships no config, a green run means nothing\" warning is retired. Verified 2026-09-09."
     reference_for:
       - "Error/response abstractions — src/errors/"
       - "Tenant-safe data access and transactions — src/db/db.ts"
