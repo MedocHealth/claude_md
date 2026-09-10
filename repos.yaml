@@ -72,8 +72,8 @@ couplings:
     why: "every JWKS-verifying service treats the audience claim as an authorization gate"
   msf-core-consumers:
     trigger: "you changed msf-core"
-    also: [admin-dashboard-backend]
-    why: "consumers pin by git tag — tag a release, then bump the consumer"
+    also: [admin-dashboard-backend, HPlus-Backend, hospital-plus-frontend]
+    why: "admin-dashboard-backend and HPlus-Backend pin by git tag — tag a release, then bump BOTH. hospital-plus-frontend has no dependency edge to follow and is the one that gets missed: it is Flutter, so it cannot consume the TS package and instead RE-IMPLEMENTS the engine in Dart under lib/src/features/msf/engine/ (msf_validate, msf_scoring, msf_dep, prefill_state). A behaviour fix in msf-core does not reach it. Ask 'does the Dart engine do this too?' and grep that directory."
 
 repos:
   # ---------------- Hospital+ / Axon ----------------
@@ -98,7 +98,11 @@ repos:
     status: canonical
     product: hospital-plus
     role: "Flutter app (Provider state management)."
-    notes: ["Consumes medoc_payment_package at `ref: main` — UNPINNED, so any push to that package is a live change here."]
+    couplings: [msf-core-consumers]
+    notes:
+      - "Consumes medoc_payment_package at `ref: main` — UNPINNED, so any push to that package is a live change here."
+      - "Re-implements msf-core's engine in Dart under lib/src/features/msf/engine/. It is a duplicate of behaviour, not a dependency, so nothing breaks when the two drift — the ward just gets the old behaviour. Check it whenever msf-core changes."
+      - "`tool/msf_print_shim.mjs` (dev-only demo) imports ../msf-core/dist/index.mjs from the SIBLING CHECKOUT with no version pin — it renders whatever msf-core was last built locally."
   hospital_plus_build:
     status: artifact
     product: hospital-plus
