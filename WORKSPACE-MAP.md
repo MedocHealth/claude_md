@@ -125,8 +125,8 @@ where noted). ⚠ marks a repo with a committed-secret hazard (see Hazards).
 ### Outreach — sales / CRM
 - `Medoc-Outreach-Backend` **[C]** — backend (layered-mvc, `tsup`, :7001).
 - `Medoc-Outreach-Frontend` **[C]** — Next.js.
-- `outreach_medoc_backend` **[L]** — predecessor. ⚠ `/dbString` leaks Mongo URI, WhatsApp key fallback.
-- `Outreach-Dashboard-Frontend` **[L]** — predecessor Next.js (but has the richest `docs/` — good domain reference).
+- `outreach_medoc_backend` **[L]** — predecessor. **ARCHIVED on GitHub (read-only).** ⚠ `/dbString` leaks Mongo URI, WhatsApp key fallback.
+- `Outreach-Dashboard-Frontend` **[L, ARCHIVED — read-only]** — predecessor Next.js (but has the richest `docs/` — good domain reference).
 
 ### Campaign — marketing campaigns
 - `Campaign-Dashboard-Backend` **[C]** — backend (layered-mvc, `tsup`, :7001).

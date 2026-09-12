@@ -14,7 +14,7 @@
 
 meta:
   verified: "2026-08-28"
-  workspace_repos: 89
+  workspace_repos: 90
 
 # Status vocabulary:
 #   canonical — edit here
@@ -23,10 +23,13 @@ meta:
 #   artifact  — compiled output, not source. Never hand-edit.
 #   stub      — empty or placeholder
 #   package   — library consumed by other repos
+#
+# archived: true — the GitHub repo is archived and READ-ONLY. Nothing can be pushed to it,
+# which makes it the strongest possible form of the dormant guard.
 
 products:
   hospital-plus: { name: "Hospital+ (Axon)", persona: "Hospital staff, doctors, admins" }
-  medoc-plus:    { name: "Medoc+ (Vigil)",   persona: "Medoc super-admins, operators, support" }
+  medoc-plus:    { name: "Medoc+ (Vigil)",   persona: "Floor staff: nurses, paramedics, pharmacists, phlebotomists (role string + attendance state, no RBAC layer)" }
   docapp:        { name: "DocApp / DocAssist", persona: "Doctors, voice-driven prescribing" }
   me:            { name: "ME (Medoc EUA)",   persona: "Patients / end users" }
   care:          { name: "Care Dashboard",   persona: "NABH accreditation & compliance" }
@@ -69,8 +72,8 @@ couplings:
     why: "every JWKS-verifying service treats the audience claim as an authorization gate"
   msf-core-consumers:
     trigger: "you changed msf-core"
-    also: [admin-dashboard-backend]
-    why: "consumers pin by git tag — tag a release, then bump the consumer"
+    also: [admin-dashboard-backend, HPlus-Backend, hospital-plus-frontend]
+    why: "admin-dashboard-backend and HPlus-Backend pin by git tag — tag a release, then bump BOTH. hospital-plus-frontend has no dependency edge to follow and is the one that gets missed: it is Flutter, so it cannot consume the TS package and instead RE-IMPLEMENTS the engine in Dart under lib/src/features/msf/engine/ (msf_validate, msf_scoring, msf_dep, prefill_state). A behaviour fix in msf-core does not reach it. Ask 'does the Dart engine do this too?' and grep that directory."
 
 repos:
   # ---------------- Hospital+ / Axon ----------------
@@ -84,9 +87,9 @@ repos:
       - "JWT fallback secrets in verifyTokens.ts and permissionMiddleware.ts — tokens are forgeable if the env var is unset."
       - "Cloudinary credentials in source."
     notes:
-      - "`npm run dev` runs `npm run initialize` first (seeds/derives state). Do not skip it."
+      - "`npm run dev` is just `nodemon` — it does NOT run `npm run initialize`. Run the initializer yourself when you need seeded/derived state."
       - "Path aliases are BARE (`utils/x`), not `@/` — check tsconfig.json before importing."
-      - "Has ts-jest but never wires it; the single test file cannot execute. Wire a config before claiming a test passes."
+      - "jest IS wired now (jest.config.js, ts-jest with a CommonJS override because the project builds as NodeNext). `npx jest` runs 3 suites for real — the old \"declares jest but ships no config, a green run means nothing\" warning is retired. Verified 2026-09-09."
     reference_for:
       - "Error/response abstractions — src/errors/"
       - "Tenant-safe data access and transactions — src/db/db.ts"
@@ -95,7 +98,11 @@ repos:
     status: canonical
     product: hospital-plus
     role: "Flutter app (Provider state management)."
-    notes: ["Consumes medoc_payment_package at `ref: main` — UNPINNED, so any push to that package is a live change here."]
+    couplings: [msf-core-consumers]
+    notes:
+      - "Consumes medoc_payment_package at `ref: main` — UNPINNED, so any push to that package is a live change here."
+      - "Re-implements msf-core's engine in Dart under lib/src/features/msf/engine/. It is a duplicate of behaviour, not a dependency, so nothing breaks when the two drift — the ward just gets the old behaviour. Check it whenever msf-core changes."
+      - "`tool/msf_print_shim.mjs` (dev-only demo) imports ../msf-core/dist/index.mjs from the SIBLING CHECKOUT with no version pin — it renders whatever msf-core was last built locally."
   hospital_plus_build:
     status: artifact
     product: hospital-plus
@@ -298,12 +305,14 @@ repos:
   outreach_medoc_backend:
     status: legacy
     live: Medoc-Outreach-Backend
+    archived: true
     product: outreach
     role: "Predecessor backend (last touched 2026-04)."
     hazards: ["Unauthenticated GET /dbString returns the live MONGODB_URI.", "WhatsApp key fallback."]
   Outreach-Dashboard-Frontend:
     status: legacy
     live: Medoc-Outreach-Frontend
+    archived: true
     product: outreach
     role: "Predecessor Next.js frontend (2026-03)."
     hazards: ["Tracked env.txt."]
@@ -395,7 +404,8 @@ repos:
     notes:
       - "NO package-lock.json — `npm ci` FAILS here. Use `npm install`, then `npm run generate:keys` before first boot."
       - "PRIVATE_KEY_PATH and PUBLIC_KEY_PATH are required env keys; the service throws at boot without them."
-      - "Declares `test: jest` but ships no jest config and no ts-jest."
+      - "Declares `test: jest` but ships no jest config and no ts-jest on main; branch feat/assistant-audience adds jest.config.cjs + 18 tests (drop this note when merged)."
+      - "Server-to-server routes /api/service/* (x-service-key, SERVICE_API_KEYS) mint assistant_service_token and own assistant.whatsapp_links — branch feat/assistant-audience."
     reference_for: ["Service structure, env validation (EnvConfig singleton), DI"]
   medoc-upload-service:
     status: canonical
@@ -444,6 +454,18 @@ repos:
     role: "RabbitMQ → WhatsApp consumer."
     notes: ["Tests compile through tsconfig.test.json, NOT tsconfig.json."]
     reference_for: ["Resilient messaging — src/rabbitmqManager.ts", "Env validation (EnvConfig singleton)"]
+  medoc-assistant-service:
+    status: canonical
+    product: platform
+    role: "WhatsApp Assistant — Meta Cloud API webhook, identity bridge (auth-service mint → HPlus as the user, no geofence), agent + RAG workers. Spec: claude_md/specs/whatsapp-assistant/."
+    port: 4010
+    couplings: [jwt-claims, api-contract]
+    notes:
+      - "Two processes: api (webhook must ack Meta <1 s) and worker (RabbitMQ consumers). Contracts other repos code against live in contracts/."
+      - "The webhook verifies the RAW body; never add a global express.json() above /webhooks."
+      - "hospitalId comes from the link/session only; MongoDB.getCollection(name, hospitalId) validates against the registry and refuses raw _db names."
+      - "Created 2026-09-05 (M0). Local repo only until the GitHub repo exists (Day-0 checklist #2)."
+    reference_for: ["Signed-webhook + idempotency ledger (src/middlewares/meta-signature.ts, src/services/inbound-ledger.service.ts)", "Jest harness that shims ESM-only deps (jose, uuid)"]
   medoc-face-auth-service:
     status: canonical
     product: platform
